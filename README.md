@@ -32,7 +32,9 @@ The generated installer is written to `dist/`:
 ## Checks
 
 ```bash
+npm run lint
 npm run type-check
+npm test
 npm run build
 ```
 

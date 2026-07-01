@@ -29,5 +29,5 @@
       "*": ["./node_modules/@types/*", "./node_modules/*"]
     }
   },
-  "include": ["renderer", "vite.config.ts"]
+  "include": ["renderer", "tests", "vite.config.ts", "vitest.config.ts"]
 }

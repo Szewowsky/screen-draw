@@ -16,6 +16,7 @@
     "start": "electron .",
     "dist": "npm run build && electron-builder --mac dmg zip --publish never",
     "lint": "eslint .",
+    "test": "vitest run",
     "type-check": "tsc --noEmit && tsc -p main/tsconfig.json --noEmit",
     "format": "oxfmt --write ."
   },
@@ -53,7 +54,8 @@
     "tailwindcss": "^4.2.2",
     "tsx": "^4.20.5",
     "typescript": "^5.5.3",
-    "vite": "^8.0.2"
+    "vite": "^8.0.2",
+    "vitest": "^4.1.9"
   },
   "engines": {
     "node": ">=22"

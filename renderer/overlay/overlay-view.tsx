@@ -30,18 +30,21 @@ import {
   X,
 } from "lucide-react";
 import { MAX_SIZE, MIN_SIZE, PALETTE, type DrawTool, type ScreenDrawSettings } from "./constants";
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface Shape {
-  tool: DrawTool;
-  color: string;
-  size: number;
-  points: Point[];
-}
+import {
+  arrowHeadPoints,
+  canRedo as modelCanRedo,
+  canUndo as modelCanUndo,
+  clearAll as modelClearAll,
+  commitShape,
+  createModel,
+  redo as modelRedo,
+  startShape,
+  undo as modelUndo,
+  updateShape,
+  type DrawingModel,
+  type Point,
+  type Shape,
+} from "./drawing-model";
 
 interface OverlayWindowState {
   activeDisplayId?: number | null;
@@ -67,38 +70,13 @@ function normalizeDisplayId(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-/** Apply the Shift-key constraint to a shape's end point (45° snap for lines, square/circle for boxes). */
-function constrainPoint(tool: DrawTool, start: Point, end: Point, shift: boolean): Point {
-  if (!shift) return end;
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  if (tool === "line" || tool === "arrow") {
-    const step = Math.PI / 4;
-    const snapped = Math.round(Math.atan2(dy, dx) / step) * step;
-    const len = Math.hypot(dx, dy);
-    return { x: start.x + len * Math.cos(snapped), y: start.y + len * Math.sin(snapped) };
-  }
-  if (tool === "rectangle" || tool === "ellipse") {
-    const side = Math.max(Math.abs(dx), Math.abs(dy));
-    return { x: start.x + (dx < 0 ? -side : side), y: start.y + (dy < 0 ? -side : side) };
-  }
-  return end;
-}
-
 function drawArrowHead(ctx: CanvasRenderingContext2D, from: Point, to: Point, size: number) {
-  const headLen = Math.max(12, size * 3.5);
-  const angle = Math.atan2(to.y - from.y, to.x - from.x);
+  const [left, right] = arrowHeadPoints(from, to, size);
   ctx.beginPath();
   ctx.moveTo(to.x, to.y);
-  ctx.lineTo(
-    to.x - headLen * Math.cos(angle - Math.PI / 6),
-    to.y - headLen * Math.sin(angle - Math.PI / 6),
-  );
+  ctx.lineTo(left.x, left.y);
   ctx.moveTo(to.x, to.y);
-  ctx.lineTo(
-    to.x - headLen * Math.cos(angle + Math.PI / 6),
-    to.y - headLen * Math.sin(angle + Math.PI / 6),
-  );
+  ctx.lineTo(right.x, right.y);
   ctx.stroke();
 }
 
@@ -162,17 +140,18 @@ function drawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
 export function OverlayView() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
-  const shapesRef = useRef<Shape[]>([]);
-  const redoRef = useRef<Shape[]>([]);
-  const currentRef = useRef<Shape | null>(null);
+  const modelRef = useRef<DrawingModel>(createModel());
   const drawingRef = useRef(false);
   const displayIdRef = useRef(getOverlayDisplayId());
 
   const [tool, setTool] = useState<DrawTool>("pen");
   const [color, setColor] = useState(PALETTE[0].value);
   const [size, setSize] = useState(4);
-  const [shapeCount, setShapeCount] = useState(0);
-  const [redoCount, setRedoCount] = useState(0);
+  const [historyState, setHistoryState] = useState({
+    canUndo: false,
+    canRedo: false,
+    hasShapes: false,
+  });
   const [activeDisplayId, setActiveDisplayId] = useState<number | null>(displayIdRef.current);
   const activeDisplayIdRef = useRef<number | null>(activeDisplayId);
   activeDisplayIdRef.current = activeDisplayId;
@@ -193,13 +172,31 @@ export function OverlayView() {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
-    for (const shape of shapesRef.current) {
+    const model = modelRef.current;
+    for (const shape of model.shapes) {
       drawShape(ctx, shape);
     }
-    if (currentRef.current) {
-      drawShape(ctx, currentRef.current);
+    if (model.current) {
+      drawShape(ctx, model.current);
     }
   }, []);
+
+  /** Store the next model state, repaint, and sync the toolbar's enabled states. */
+  const applyModel = useCallback(
+    (next: DrawingModel) => {
+      modelRef.current = next;
+      redraw();
+      setHistoryState((prev) => {
+        const canUndo = modelCanUndo(next);
+        const canRedo = modelCanRedo(next);
+        const hasShapes = next.shapes.length > 0;
+        return prev.canUndo === canUndo && prev.canRedo === canRedo && prev.hasShapes === hasShapes
+          ? prev
+          : { canUndo, canRedo, hasShapes };
+      });
+    },
+    [redraw],
+  );
 
   const setupCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -219,30 +216,16 @@ export function OverlayView() {
   }, [redraw]);
 
   const undo = useCallback(() => {
-    const shape = shapesRef.current.pop();
-    if (!shape) return;
-    redoRef.current.push(shape);
-    setShapeCount(shapesRef.current.length);
-    setRedoCount(redoRef.current.length);
-    redraw();
-  }, [redraw]);
+    applyModel(modelUndo(modelRef.current));
+  }, [applyModel]);
 
   const redo = useCallback(() => {
-    const shape = redoRef.current.pop();
-    if (!shape) return;
-    shapesRef.current.push(shape);
-    setShapeCount(shapesRef.current.length);
-    setRedoCount(redoRef.current.length);
-    redraw();
-  }, [redraw]);
+    applyModel(modelRedo(modelRef.current));
+  }, [applyModel]);
 
   const clearAll = useCallback(() => {
-    shapesRef.current = [];
-    redoRef.current = [];
-    setShapeCount(0);
-    setRedoCount(0);
-    redraw();
-  }, [redraw]);
+    applyModel(modelClearAll(modelRef.current));
+  }, [applyModel]);
 
   const exit = useCallback(() => {
     void window.screenDraw.ipc.invoke("overlay:setActive", false);
@@ -335,47 +318,25 @@ export function OverlayView() {
       if (e.button !== 0) return;
       selectThisDisplay();
       canvas.setPointerCapture(e.pointerId);
-      currentRef.current = {
-        tool: toolRef.current,
-        color: colorRef.current,
-        size: sizeRef.current,
-        points: [toPoint(e)],
-      };
+      applyModel(
+        startShape(
+          modelRef.current,
+          { tool: toolRef.current, color: colorRef.current, size: sizeRef.current },
+          toPoint(e),
+        ),
+      );
       drawingRef.current = true;
     };
 
     const onPointerMove = (e: PointerEvent) => {
-      const shape = currentRef.current;
-      if (!drawingRef.current || !shape) return;
-      const p = toPoint(e);
-      const start = shape.points[0];
-      if (shape.tool === "pen" || shape.tool === "highlighter") {
-        if (e.shiftKey) {
-          // Straight-line constraint: collapse the freehand stroke to origin → cursor.
-          shape.points = [start, p];
-        } else {
-          shape.points.push(p);
-        }
-      } else {
-        const end = constrainPoint(shape.tool, start, p, e.shiftKey);
-        if (shape.points.length < 2) shape.points.push(end);
-        else shape.points[1] = end;
-      }
-      redraw();
+      if (!drawingRef.current || !modelRef.current.current) return;
+      applyModel(updateShape(modelRef.current, toPoint(e), e.shiftKey));
     };
 
     const onPointerUp = () => {
       if (!drawingRef.current) return;
       drawingRef.current = false;
-      if (currentRef.current) {
-        shapesRef.current.push(currentRef.current);
-        currentRef.current = null;
-        setShapeCount(shapesRef.current.length);
-        // A new shape invalidates the redo stack, matching standard undo/redo behavior.
-        redoRef.current = [];
-        setRedoCount(0);
-      }
-      redraw();
+      applyModel(commitShape(modelRef.current));
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -425,7 +386,7 @@ export function OverlayView() {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("resize", setupCanvas);
     };
-  }, [setupCanvas, redraw, undo, redo, exit, clearAll, selectThisDisplay]);
+  }, [setupCanvas, applyModel, undo, redo, exit, clearAll, selectThisDisplay]);
 
   const showToolbar =
     displayIdRef.current === null ||
@@ -443,10 +404,11 @@ export function OverlayView() {
           onColorChange={setColor}
           size={size}
           onSizeChange={setSize}
-          canUndo={shapeCount > 0}
+          canUndo={historyState.canUndo}
           onUndo={undo}
-          canRedo={redoCount > 0}
+          canRedo={historyState.canRedo}
           onRedo={redo}
+          canClear={historyState.hasShapes}
           onClear={clearAll}
           onExit={exit}
         />
@@ -466,6 +428,7 @@ interface FloatingToolbarProps {
   onUndo: () => void;
   canRedo: boolean;
   onRedo: () => void;
+  canClear: boolean;
   onClear: () => void;
   onExit: () => void;
 }
@@ -481,6 +444,7 @@ function FloatingToolbar({
   onUndo,
   canRedo,
   onRedo,
+  canClear,
   onClear,
   onExit,
 }: FloatingToolbarProps) {
@@ -661,7 +625,7 @@ function FloatingToolbar({
             size="small"
             iconOnly
             className="!size-6"
-            disabled={!canUndo}
+            disabled={!canClear}
             onClick={onClear}
             aria-label="Clear all"
           >

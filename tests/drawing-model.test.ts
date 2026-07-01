@@ -1,0 +1,252 @@
+import { describe, expect, it } from "vitest";
+import {
+  HISTORY_LIMIT,
+  canRedo,
+  canUndo,
+  clearAll,
+  commitShape,
+  constrainPoint,
+  createModel,
+  getBounds,
+  redo,
+  startShape,
+  undo,
+  updateShape,
+  type DrawingModel,
+  type Point,
+  type Shape,
+} from "../renderer/overlay/drawing-model";
+import type { DrawTool } from "../renderer/overlay/constants";
+
+const PEN = { tool: "pen" as DrawTool, color: "#FF3B30", size: 4 };
+
+function drawStroke(model: DrawingModel, points: Point[], tool = PEN): DrawingModel {
+  let next = startShape(model, tool, points[0]);
+  for (const p of points.slice(1)) {
+    next = updateShape(next, p, false);
+  }
+  return commitShape(next);
+}
+
+describe("point collection", () => {
+  it("collects every pointer position for the pen", () => {
+    const pts = [
+      { x: 0, y: 0 },
+      { x: 5, y: 5 },
+      { x: 10, y: 3 },
+    ];
+    const model = drawStroke(createModel(), pts);
+    expect(model.shapes).toHaveLength(1);
+    expect(model.shapes[0].points).toEqual(pts);
+    expect(model.current).toBeNull();
+  });
+
+  it("collects every pointer position for the highlighter", () => {
+    const pts = [
+      { x: 1, y: 2 },
+      { x: 3, y: 4 },
+    ];
+    const model = drawStroke(createModel(), pts, { ...PEN, tool: "highlighter" });
+    expect(model.shapes[0].points).toEqual(pts);
+    expect(model.shapes[0].tool).toBe("highlighter");
+  });
+
+  it("keeps a single-tap stroke as one point (rendered as a dot)", () => {
+    const model = commitShape(startShape(createModel(), PEN, { x: 7, y: 8 }));
+    expect(model.shapes[0].points).toEqual([{ x: 7, y: 8 }]);
+  });
+
+  it("collapses a pen stroke to origin → cursor while Shift is held", () => {
+    let model = startShape(createModel(), PEN, { x: 0, y: 0 });
+    model = updateShape(model, { x: 5, y: 5 }, false);
+    model = updateShape(model, { x: 20, y: 9 }, true);
+    expect(model.current?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 20, y: 9 },
+    ]);
+  });
+
+  it("keeps exactly two points for two-point shapes as the cursor moves", () => {
+    let model = startShape(createModel(), { ...PEN, tool: "rectangle" }, { x: 0, y: 0 });
+    model = updateShape(model, { x: 5, y: 5 }, false);
+    model = updateShape(model, { x: 9, y: 2 }, false);
+    expect(model.current?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 9, y: 2 },
+    ]);
+  });
+});
+
+describe("Shift constraints", () => {
+  const start = { x: 10, y: 10 };
+
+  it("returns the end point unchanged without Shift", () => {
+    const end = { x: 42, y: 17 };
+    for (const tool of ["pen", "highlighter", "line", "arrow", "rectangle", "ellipse"] as const) {
+      expect(constrainPoint(tool, start, end, false)).toEqual(end);
+    }
+  });
+
+  it("snaps lines and arrows to 45° increments, preserving length", () => {
+    for (const tool of ["line", "arrow"] as const) {
+      // Nearly horizontal drag snaps to exactly horizontal.
+      const nearlyFlat = constrainPoint(tool, start, { x: 30, y: 12 }, true);
+      const len = Math.hypot(20, 2);
+      expect(nearlyFlat.x).toBeCloseTo(start.x + len);
+      expect(nearlyFlat.y).toBeCloseTo(start.y);
+
+      // A ~40° drag snaps to the 45° diagonal.
+      const diagonal = constrainPoint(tool, start, { x: 20, y: 18.5 }, true);
+      const dx = diagonal.x - start.x;
+      const dy = diagonal.y - start.y;
+      expect(dy).toBeCloseTo(dx);
+    }
+  });
+
+  it("constrains rectangles and ellipses to squares in every drag direction", () => {
+    for (const tool of ["rectangle", "ellipse"] as const) {
+      expect(constrainPoint(tool, start, { x: 30, y: 15 }, true)).toEqual({ x: 30, y: 30 });
+      expect(constrainPoint(tool, start, { x: -10, y: 15 }, true)).toEqual({ x: -10, y: 30 });
+      expect(constrainPoint(tool, start, { x: 15, y: -30 }, true)).toEqual({ x: 50, y: -30 });
+    }
+  });
+
+  it("does not constrain pen or highlighter end points (Shift is handled as a straight stroke)", () => {
+    const end = { x: 30, y: 12 };
+    expect(constrainPoint("pen", start, end, true)).toEqual(end);
+    expect(constrainPoint("highlighter", start, end, true)).toEqual(end);
+  });
+});
+
+describe("undo/redo", () => {
+  const p = (x: number): Point[] => [
+    { x, y: 0 },
+    { x, y: 10 },
+  ];
+
+  it("starts with nothing to undo or redo", () => {
+    const model = createModel();
+    expect(canUndo(model)).toBe(false);
+    expect(canRedo(model)).toBe(false);
+  });
+
+  it("round-trips adds through undo and redo", () => {
+    let model = drawStroke(createModel(), p(1));
+    model = drawStroke(model, p(2));
+
+    model = undo(model);
+    expect(model.shapes).toHaveLength(1);
+    expect(canRedo(model)).toBe(true);
+
+    model = redo(model);
+    expect(model.shapes).toHaveLength(2);
+    expect(model.shapes[1].points).toEqual(p(2));
+    expect(canRedo(model)).toBe(false);
+  });
+
+  it("is a no-op when there is nothing to undo or redo", () => {
+    const empty = createModel();
+    expect(undo(empty)).toBe(empty);
+    expect(redo(empty)).toBe(empty);
+  });
+
+  it("clears the redo stack when a new shape is drawn", () => {
+    let model = drawStroke(createModel(), p(1));
+    model = drawStroke(model, p(2));
+    model = undo(model);
+    expect(canRedo(model)).toBe(true);
+
+    model = drawStroke(model, p(3));
+    expect(canRedo(model)).toBe(false);
+    expect(model.shapes.map((s) => s.points)).toEqual([p(1), p(3)]);
+  });
+
+  it("round-trips clear-all through undo and redo", () => {
+    let model = drawStroke(createModel(), p(1));
+    model = drawStroke(model, p(2));
+
+    model = clearAll(model);
+    expect(model.shapes).toHaveLength(0);
+
+    model = undo(model);
+    expect(model.shapes).toHaveLength(2);
+
+    model = redo(model);
+    expect(model.shapes).toHaveLength(0);
+  });
+
+  it("treats clear-all on an empty canvas as a no-op (nothing recorded in history)", () => {
+    const model = createModel();
+    expect(clearAll(model)).toBe(model);
+  });
+
+  it(`caps history at ${HISTORY_LIMIT} entries, evicting the oldest`, () => {
+    const extra = 5;
+    let model = createModel();
+    for (let i = 0; i < HISTORY_LIMIT + extra; i++) {
+      model = drawStroke(model, p(i));
+    }
+
+    let undos = 0;
+    while (canUndo(model)) {
+      model = undo(model);
+      undos++;
+    }
+
+    expect(undos).toBe(HISTORY_LIMIT);
+    // The oldest `extra` shapes fell out of history and can no longer be undone.
+    expect(model.shapes).toHaveLength(extra);
+    expect(model.shapes[0].points).toEqual(p(0));
+  });
+});
+
+describe("bounds", () => {
+  it("returns null for a shape with no points", () => {
+    const shape: Shape = { ...PEN, points: [] };
+    expect(getBounds(shape)).toBeNull();
+  });
+
+  it("covers all stroke points padded by half the stroke width", () => {
+    const shape: Shape = {
+      ...PEN,
+      size: 6,
+      points: [
+        { x: 10, y: 20 },
+        { x: 40, y: 5 },
+        { x: 25, y: 30 },
+      ],
+    };
+    expect(getBounds(shape)).toEqual({ minX: 7, minY: 2, maxX: 43, maxY: 33 });
+  });
+
+  it("uses the widened highlighter band for padding", () => {
+    const shape: Shape = {
+      ...PEN,
+      tool: "highlighter",
+      size: 4,
+      points: [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+      ],
+    };
+    // Highlighter paints at size * 5 → pad 10.
+    expect(getBounds(shape)).toEqual({ minX: -10, minY: -10, maxX: 20, maxY: 10 });
+  });
+
+  it("includes the arrowhead wings for arrows", () => {
+    const shape: Shape = {
+      ...PEN,
+      tool: "arrow",
+      size: 4,
+      points: [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+      ],
+    };
+    const bounds = getBounds(shape);
+    // Wings of a horizontal arrow extend headLen * sin(30°) = 7 above and below the shaft.
+    expect(bounds).not.toBeNull();
+    expect(bounds!.minY).toBeLessThanOrEqual(-7);
+    expect(bounds!.maxY).toBeGreaterThanOrEqual(7);
+  });
+});
