@@ -28,23 +28,52 @@ export interface Shape {
 /** Maximum number of undoable operations kept in history (oldest evicted first). */
 export const HISTORY_LIMIT = 100;
 
+/** Extra grab distance beyond the painted stroke, so thin lines stay selectable. */
+export const HIT_TOLERANCE = 4;
+
+/** An in-progress move of the selected shape (the shape is lifted out of `shapes`). */
+export interface DragState {
+  /** Z-order position the shape is restored to when the drag ends. */
+  readonly index: number;
+  /** Pointer position where the drag started. */
+  readonly start: Point;
+  /** The untranslated shape being dragged. */
+  readonly base: Shape;
+  /** The committed set before the drag, recorded in history when the move commits. */
+  readonly baseShapes: readonly Shape[];
+  readonly dx: number;
+  readonly dy: number;
+}
+
 export interface DrawingModel {
   /** Committed shapes in painter order (last = topmost). */
   readonly shapes: readonly Shape[];
   /** The in-progress shape being drawn, if any. */
   readonly current: Shape | null;
+  /** Index of the selected shape in `shapes`, or null. At most one shape is selected. */
+  readonly selectedIndex: number | null;
+  /** The in-progress move of the selected shape, if any. */
+  readonly drag: DragState | null;
   readonly undoStack: readonly (readonly Shape[])[];
   readonly redoStack: readonly (readonly Shape[])[];
   /**
    * Bumped whenever the committed shape set changes (commit, undo, redo,
-   * clear). Renderers cache a rasterized committed layer and rebuild it only
-   * when this changes; in-progress updates leave it untouched.
+   * clear, move, delete). Renderers cache a rasterized committed layer and
+   * rebuild it only when this changes; in-progress updates leave it untouched.
    */
   readonly revision: number;
 }
 
 export function createModel(): DrawingModel {
-  return { shapes: [], current: null, undoStack: [], redoStack: [], revision: 0 };
+  return {
+    shapes: [],
+    current: null,
+    selectedIndex: null,
+    drag: null,
+    undoStack: [],
+    redoStack: [],
+    revision: 0,
+  };
 }
 
 /** Apply the Shift-key constraint to a shape's end point (45° snap for lines, square/circle for boxes). */
@@ -104,6 +133,7 @@ function pushHistory(
 export function commitShape(model: DrawingModel): DrawingModel {
   if (!model.current) return model;
   return {
+    ...model,
     shapes: [...model.shapes, model.current],
     current: null,
     undoStack: pushHistory(model.undoStack, model.shapes),
@@ -114,10 +144,11 @@ export function commitShape(model: DrawingModel): DrawingModel {
 
 export function undo(model: DrawingModel): DrawingModel {
   const snapshot = model.undoStack[model.undoStack.length - 1];
-  if (!snapshot) return model;
+  if (!snapshot || model.drag) return model;
   return {
     ...model,
     shapes: snapshot,
+    selectedIndex: null,
     undoStack: model.undoStack.slice(0, -1),
     redoStack: [...model.redoStack, model.shapes],
     revision: model.revision + 1,
@@ -126,10 +157,11 @@ export function undo(model: DrawingModel): DrawingModel {
 
 export function redo(model: DrawingModel): DrawingModel {
   const snapshot = model.redoStack[model.redoStack.length - 1];
-  if (!snapshot) return model;
+  if (!snapshot || model.drag) return model;
   return {
     ...model,
     shapes: snapshot,
+    selectedIndex: null,
     undoStack: pushHistory(model.undoStack, model.shapes),
     redoStack: model.redoStack.slice(0, -1),
     revision: model.revision + 1,
@@ -138,14 +170,97 @@ export function redo(model: DrawingModel): DrawingModel {
 
 /** Remove all committed shapes. Undoable like any other operation. */
 export function clearAll(model: DrawingModel): DrawingModel {
-  if (model.shapes.length === 0) return model;
+  if (model.shapes.length === 0 && !model.drag) return model;
   return {
     ...model,
     shapes: [],
+    selectedIndex: null,
+    drag: null,
+    undoStack: pushHistory(model.undoStack, model.drag ? model.drag.baseShapes : model.shapes),
+    redoStack: [],
+    revision: model.revision + 1,
+  };
+}
+
+/** Select the shape at `index` (or deselect with null). No-op while dragging. */
+export function selectShape(model: DrawingModel, index: number | null): DrawingModel {
+  if (model.drag) return model;
+  const valid = index !== null && index >= 0 && index < model.shapes.length ? index : null;
+  if (valid === model.selectedIndex) return model;
+  return { ...model, selectedIndex: valid };
+}
+
+/**
+ * Start moving the selected shape. The shape is lifted out of the committed
+ * set (so the cached layer rebuilds without it once) and rendered separately
+ * while the drag is in progress.
+ */
+export function beginDrag(model: DrawingModel, point: Point): DrawingModel {
+  if (model.drag || model.selectedIndex === null) return model;
+  const index = model.selectedIndex;
+  const base = model.shapes[index];
+  return {
+    ...model,
+    shapes: model.shapes.filter((_, i) => i !== index),
+    selectedIndex: null,
+    drag: { index, start: point, base, baseShapes: model.shapes, dx: 0, dy: 0 },
+    revision: model.revision + 1,
+  };
+}
+
+/** Track the pointer during a move. Does not touch the committed set. */
+export function updateDrag(model: DrawingModel, point: Point): DrawingModel {
+  const drag = model.drag;
+  if (!drag) return model;
+  return {
+    ...model,
+    drag: { ...drag, dx: point.x - drag.start.x, dy: point.y - drag.start.y },
+  };
+}
+
+/** The dragged shape at its current position. */
+export function draggedShape(drag: DragState): Shape {
+  return translateShape(drag.base, drag.dx, drag.dy);
+}
+
+/**
+ * Commit the move: the shape returns to its original z-order at the new
+ * position and stays selected. A zero-distance drag (a plain selection click)
+ * records nothing in history.
+ */
+export function endDrag(model: DrawingModel): DrawingModel {
+  const drag = model.drag;
+  if (!drag) return model;
+  const moved = drag.dx !== 0 || drag.dy !== 0;
+  const shape = draggedShape(drag);
+  return {
+    ...model,
+    shapes: [...model.shapes.slice(0, drag.index), shape, ...model.shapes.slice(drag.index)],
+    selectedIndex: drag.index,
+    drag: null,
+    undoStack: moved ? pushHistory(model.undoStack, drag.baseShapes) : model.undoStack,
+    redoStack: moved ? [] : model.redoStack,
+    revision: model.revision + 1,
+  };
+}
+
+/** Delete the selected shape. Undoable like any other operation. */
+export function deleteSelected(model: DrawingModel): DrawingModel {
+  if (model.drag || model.selectedIndex === null) return model;
+  return {
+    ...model,
+    shapes: model.shapes.filter((_, i) => i !== model.selectedIndex),
+    selectedIndex: null,
     undoStack: pushHistory(model.undoStack, model.shapes),
     redoStack: [],
     revision: model.revision + 1,
   };
+}
+
+/** Move a shape by (dx, dy), translating every point. */
+export function translateShape(shape: Shape, dx: number, dy: number): Shape {
+  if (dx === 0 && dy === 0) return shape;
+  return { ...shape, points: shape.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) };
 }
 
 export function canUndo(model: DrawingModel): boolean {
@@ -204,4 +319,65 @@ export function getBounds(shape: Shape): Bounds | null {
   }
   const pad = strokeWidth(shape) / 2;
   return { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
+}
+
+function distanceToSegment(p: Point, a: Point, b: Point): number {
+  const abx = b.x - a.x;
+  const aby = b.y - a.y;
+  const lenSq = abx * abx + aby * aby;
+  const t =
+    lenSq === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / lenSq));
+  return Math.hypot(p.x - (a.x + t * abx), p.y - (a.y + t * aby));
+}
+
+function withinPolyline(point: Point, pts: readonly Point[], radius: number): boolean {
+  if (pts.length === 1) return Math.hypot(point.x - pts[0].x, point.y - pts[0].y) <= radius;
+  for (let i = 1; i < pts.length; i++) {
+    if (distanceToSegment(point, pts[i - 1], pts[i]) <= radius) return true;
+  }
+  return false;
+}
+
+const ELLIPSE_HIT_SAMPLES = 64;
+
+/** Whether `point` hits the painted outline of `shape` (stroke width + tolerance). */
+export function hitsShape(shape: Shape, point: Point): boolean {
+  const pts = shape.points;
+  if (pts.length === 0) return false;
+  const radius = strokeWidth(shape) / 2 + HIT_TOLERANCE;
+  const a = pts[0];
+  const b = pts[pts.length - 1];
+
+  switch (shape.tool) {
+    case "pen":
+    case "highlighter":
+      return withinPolyline(point, pts, radius);
+    case "line":
+    case "arrow":
+      return distanceToSegment(point, a, b) <= radius;
+    case "rectangle": {
+      const corners = [a, { x: b.x, y: a.y }, b, { x: a.x, y: b.y }, a];
+      return withinPolyline(point, corners, radius);
+    }
+    case "ellipse": {
+      const cx = (a.x + b.x) / 2;
+      const cy = (a.y + b.y) / 2;
+      const rx = Math.abs(b.x - a.x) / 2;
+      const ry = Math.abs(b.y - a.y) / 2;
+      const outline: Point[] = [];
+      for (let i = 0; i <= ELLIPSE_HIT_SAMPLES; i++) {
+        const t = (i / ELLIPSE_HIT_SAMPLES) * Math.PI * 2;
+        outline.push({ x: cx + rx * Math.cos(t), y: cy + ry * Math.sin(t) });
+      }
+      return withinPolyline(point, outline, radius);
+    }
+  }
+}
+
+/** Index of the topmost shape hit at `point`, or null. */
+export function hitTest(shapes: readonly Shape[], point: Point): number | null {
+  for (let i = shapes.length - 1; i >= 0; i--) {
+    if (hitsShape(shapes[i], point)) return i;
+  }
+  return null;
 }

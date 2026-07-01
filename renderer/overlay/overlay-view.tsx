@@ -23,6 +23,7 @@ import {
   GripVertical,
   Highlighter,
   Minus,
+  MousePointer2,
   Pencil,
   Redo2,
   Square,
@@ -34,21 +35,29 @@ import {
   MIN_SIZE,
   PALETTE,
   isPaletteColor,
-  type DrawTool,
+  type OverlayTool,
   type ScreenDrawSettings,
   type ToolbarPosition,
 } from "./constants";
 import { clampToolbarPosition, sanitizeToolbarPosition } from "./toolbar-prefs";
 import {
   arrowHeadPoints,
+  beginDrag,
   canRedo as modelCanRedo,
   canUndo as modelCanUndo,
   clearAll as modelClearAll,
   commitShape,
   createModel,
+  deleteSelected,
+  draggedShape,
+  endDrag,
+  getBounds,
+  hitTest,
   redo as modelRedo,
+  selectShape,
   startShape,
   undo as modelUndo,
+  updateDrag,
   updateShape,
   type DrawingModel,
   type Point,
@@ -59,7 +68,8 @@ interface OverlayWindowState {
   activeDisplayId?: number | null;
 }
 
-const TOOLS: { tool: DrawTool; label: string; key: string; Icon: typeof Pencil }[] = [
+const TOOLS: { tool: OverlayTool; label: string; key: string; Icon: typeof Pencil }[] = [
+  { tool: "select", label: "Select", key: "V", Icon: MousePointer2 },
   { tool: "pen", label: "Pen", key: "P", Icon: Pencil },
   { tool: "highlighter", label: "Highlighter", key: "H", Icon: Highlighter },
   { tool: "line", label: "Line", key: "L", Icon: Minus },
@@ -67,6 +77,26 @@ const TOOLS: { tool: DrawTool; label: string; key: string; Icon: typeof Pencil }
   { tool: "rectangle", label: "Rectangle", key: "R", Icon: Square },
   { tool: "ellipse", label: "Ellipse", key: "O", Icon: Circle },
 ];
+
+/** Padding between a selected shape's bounds and the dashed indicator box. */
+const SELECTION_PADDING = 4;
+
+function drawSelectionIndicator(ctx: CanvasRenderingContext2D, shape: Shape) {
+  const bounds = getBounds(shape);
+  if (!bounds) return;
+  ctx.save();
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = "#0A84FF";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 4]);
+  ctx.strokeRect(
+    bounds.minX - SELECTION_PADDING,
+    bounds.minY - SELECTION_PADDING,
+    bounds.maxX - bounds.minX + SELECTION_PADDING * 2,
+    bounds.maxY - bounds.minY + SELECTION_PADDING * 2,
+  );
+  ctx.restore();
+}
 
 function getOverlayDisplayId(): number | null {
   const value = new URLSearchParams(window.location.search).get("displayId");
@@ -153,7 +183,7 @@ export function OverlayView() {
   const drawingRef = useRef(false);
   const displayIdRef = useRef(getOverlayDisplayId());
 
-  const [tool, setTool] = useState<DrawTool>("pen");
+  const [tool, setTool] = useState<OverlayTool>("pen");
   const [color, setColor] = useState(PALETTE[0].value);
   const [size, setSize] = useState(4);
   const [recentColors, setRecentColors] = useState<string[]>([]);
@@ -220,6 +250,18 @@ export function OverlayView() {
     if (model.current) {
       drawShape(ctx, model.current);
     }
+    // The shape being moved (and the selection indicator) render on top of the
+    // cached committed layer.
+    const selected =
+      model.drag !== null
+        ? draggedShape(model.drag)
+        : model.selectedIndex !== null
+          ? model.shapes[model.selectedIndex]
+          : null;
+    if (selected) {
+      if (model.drag) drawShape(ctx, selected);
+      drawSelectionIndicator(ctx, selected);
+    }
   }, []);
 
   /** Store the next model state, repaint, and sync the toolbar's enabled states. */
@@ -255,6 +297,17 @@ export function OverlayView() {
     ctxRef.current = ctx;
     redraw();
   }, [redraw]);
+
+  const changeTool = useCallback(
+    (next: OverlayTool) => {
+      setTool(next);
+      // Selection only makes sense with the select tool active.
+      if (next !== "select") {
+        applyModel(selectShape(modelRef.current, null));
+      }
+    },
+    [applyModel],
+  );
 
   const undo = useCallback(() => {
     applyModel(modelUndo(modelRef.current));
@@ -397,30 +450,62 @@ export function OverlayView() {
       if (e.button !== 0) return;
       selectThisDisplay();
       canvas.setPointerCapture(e.pointerId);
+      const activeTool = toolRef.current;
+      const p = toPoint(e);
+      if (activeTool === "select") {
+        // Click selects the topmost hit shape (and arms a drag) or deselects.
+        const model = modelRef.current;
+        const index = hitTest(model.shapes, p);
+        let next = selectShape(model, index);
+        if (index !== null) next = beginDrag(next, p);
+        applyModel(next);
+        return;
+      }
       applyModel(
         startShape(
           modelRef.current,
-          { tool: toolRef.current, color: colorRef.current, size: sizeRef.current },
-          toPoint(e),
+          { tool: activeTool, color: colorRef.current, size: sizeRef.current },
+          p,
         ),
       );
       drawingRef.current = true;
     };
 
     const onPointerMove = (e: PointerEvent) => {
-      if (!drawingRef.current || !modelRef.current.current) return;
-      applyModel(updateShape(modelRef.current, toPoint(e), e.shiftKey));
+      const model = modelRef.current;
+      if (model.drag) {
+        applyModel(updateDrag(model, toPoint(e)));
+        return;
+      }
+      if (!drawingRef.current || !model.current) return;
+      applyModel(updateShape(model, toPoint(e), e.shiftKey));
     };
 
     const onPointerUp = () => {
+      const model = modelRef.current;
+      if (model.drag) {
+        applyModel(endDrag(model));
+        return;
+      }
       if (!drawingRef.current) return;
       drawingRef.current = false;
-      applyModel(commitShape(modelRef.current));
+      applyModel(commitShape(model));
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        // Escape first drops the selection (or an in-progress move); only a
+        // second press exits drawing mode.
+        const model = modelRef.current;
+        if (model.drag) {
+          applyModel(selectShape(endDrag(model), null));
+          return;
+        }
+        if (model.selectedIndex !== null) {
+          applyModel(selectShape(model, null));
+          return;
+        }
         exit();
         return;
       }
@@ -433,11 +518,19 @@ export function OverlayView() {
       // Plain single-key shortcuts (skip when a command/control/option modifier is held).
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
+      if (e.key === "Backspace" || e.key === "Delete") {
+        if (modelRef.current.selectedIndex !== null) {
+          e.preventDefault();
+          applyModel(deleteSelected(modelRef.current));
+        }
+        return;
+      }
+
       const key = e.key.toLowerCase();
       const toolForKey = TOOLS.find((t) => t.key.toLowerCase() === key);
       if (toolForKey) {
         e.preventDefault();
-        setTool(toolForKey.tool);
+        changeTool(toolForKey.tool);
       } else if (key === "c") {
         e.preventDefault();
         clearAll();
@@ -465,7 +558,7 @@ export function OverlayView() {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("resize", setupCanvas);
     };
-  }, [setupCanvas, applyModel, undo, redo, exit, clearAll, selectThisDisplay]);
+  }, [setupCanvas, applyModel, undo, redo, exit, clearAll, selectThisDisplay, changeTool]);
 
   const showToolbar =
     displayIdRef.current === null ||
@@ -474,11 +567,16 @@ export function OverlayView() {
 
   return (
     <div className="fixed inset-0 h-full w-full">
-      <canvas ref={canvasRef} className="absolute inset-0 cursor-crosshair" />
+      <canvas
+        ref={canvasRef}
+        className={
+          "absolute inset-0 " + (tool === "select" ? "cursor-default" : "cursor-crosshair")
+        }
+      />
       {showToolbar ? (
         <FloatingToolbar
           tool={tool}
-          onToolChange={setTool}
+          onToolChange={changeTool}
           color={color}
           onColorChange={setColor}
           onColorCommit={recordRecentColor}
@@ -502,8 +600,8 @@ export function OverlayView() {
 }
 
 interface FloatingToolbarProps {
-  tool: DrawTool;
-  onToolChange: (tool: DrawTool) => void;
+  tool: OverlayTool;
+  onToolChange: (tool: OverlayTool) => void;
   color: string;
   onColorChange: (color: string) => void;
   onColorCommit: (color: string) => void;
@@ -603,7 +701,7 @@ function FloatingToolbar({
         value={tool}
         className="!rounded-[11px] !p-1"
         onValueChange={(value) => {
-          if (typeof value === "string" && value) onToolChange(value as DrawTool);
+          if (typeof value === "string" && value) onToolChange(value as OverlayTool);
         }}
         aria-label="Drawing tool"
       >

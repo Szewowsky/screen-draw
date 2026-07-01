@@ -29,6 +29,7 @@ import {
 } from "../overlay/constants";
 
 const SHORTCUT_ROWS: { label: string; keys: ReactNode }[] = [
+  { label: "Select & move", keys: <Key>V</Key> },
   { label: "Pen", keys: <Key>P</Key> },
   { label: "Highlighter", keys: <Key>H</Key> },
   { label: "Line", keys: <Key>L</Key> },
@@ -56,6 +57,7 @@ const SHORTCUT_ROWS: { label: string; keys: ReactNode }[] = [
       </span>
     ),
   },
+  { label: "Delete selected shape", keys: <Key>⌫</Key> },
   { label: "Clear all", keys: <Key>C</Key> },
   {
     label: "Undo",
@@ -87,7 +89,7 @@ const SHORTCUT_ROWS: { label: string; keys: ReactNode }[] = [
       </span>
     ),
   },
-  { label: "Stop drawing", keys: <Key>Esc</Key> },
+  { label: "Deselect / stop drawing", keys: <Key>Esc</Key> },
 ];
 
 const MODIFIER_GLYPHS: Record<string, string> = {
