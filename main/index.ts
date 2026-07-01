@@ -160,17 +160,16 @@ async function setupApplicationMenu() {
 // ── Menu bar tray ─────────────────────────────────────────────────────
 function setupTray() {
   const trayIconSvg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
-      <path d="M2.7 12.3c1.8-2.8 5.3-1.1 6.6-3.6.7-1.4-.8-2.7-2.2-1.7-2.3 1.7-1 6.1 2.4 6.1 2 0 3.4-1.1 4.6-2.8" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M11 6.7 14.8 2.9l1.3 1.3-3.8 3.8-2 .7.7-2Z" fill="black"/>
+    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
+      <path d="M3.2 14.2c2.4-3.5 6.9-1.4 8.5-4.8.9-1.9-1.2-3.4-3-2-3.1 2.4-1.2 7.7 3.2 7.7 2.7 0 4.5-1.5 6.1-3.9" fill="none" stroke="black" stroke-width="2.45" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M13.3 7.5 18.1 2.7l1.8 1.8-4.8 4.8-2.8.9 1-2.7Z" fill="black"/>
     </svg>
   `;
   const icon = nativeImage.createFromDataURL(
     `data:image/svg+xml;base64,${Buffer.from(trayIconSvg).toString("base64")}`,
-  );
+  ).resize({ width: 22, height: 22 });
   icon.setTemplateImage(true);
   tray = new Tray(icon);
-  tray.setTitle("✎");
   tray.setToolTip("Screen Draw");
 
   const trayMenu = Menu.buildFromTemplate([

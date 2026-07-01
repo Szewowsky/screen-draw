@@ -430,8 +430,8 @@ function FloatingToolbar({
     <div
       ref={barRef}
       className={
-        "fixed z-30 flex h-11 items-center gap-1.5 rounded-panel border border-separator bg-popover px-2 shadow-lg" +
-        (pos ? "" : " bottom-8 left-1/2 -translate-x-1/2")
+        "fixed z-30 flex h-10 items-center gap-1 rounded-[13px] border border-white/10 bg-[#1d1d1f]/95 px-2 shadow-[0_12px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl" +
+        (pos ? "" : " bottom-6 left-1/2 -translate-x-1/2")
       }
       style={pos ? { left: pos.x, top: pos.y } : undefined}
     >
@@ -441,9 +441,9 @@ function FloatingToolbar({
             type="button"
             aria-label="Move toolbar"
             onPointerDown={onGripDown}
-            className="flex h-7 cursor-grab items-center text-tertiary active:cursor-grabbing"
+            className="flex h-7 w-5 cursor-grab items-center justify-center text-tertiary active:cursor-grabbing"
           >
-            <GripVertical className="size-4" />
+            <GripVertical className="size-3.5" />
           </button>
         </TooltipTrigger>
         <TooltipContent>Drag to move</TooltipContent>
@@ -463,8 +463,8 @@ function FloatingToolbar({
         {TOOLS.map(({ tool: t, label, key, Icon }) => (
           <Tooltip key={t}>
             <TooltipTrigger asChild>
-              <SegmentedControlItem value={t} iconOnly aria-label={label}>
-                <Icon className="size-4" />
+              <SegmentedControlItem value={t} iconOnly className="!size-7 !rounded-lg" aria-label={label}>
+                <Icon className="size-3.5" />
               </SegmentedControlItem>
             </TooltipTrigger>
             <TooltipContent shortcut={[key]}>{label}</TooltipContent>
@@ -486,7 +486,7 @@ function FloatingToolbar({
         {PALETTE.map((c, i) => (
           <Tooltip key={c.value}>
             <TooltipTrigger asChild>
-              <SegmentedControlItem value={c.value} iconOnly aria-label={c.name}>
+              <SegmentedControlItem value={c.value} iconOnly className="!size-7 !rounded-lg" aria-label={c.name}>
                 <span className="size-4 rounded-full" style={{ backgroundColor: c.value }} />
               </SegmentedControlItem>
             </TooltipTrigger>
@@ -495,7 +495,13 @@ function FloatingToolbar({
         ))}
       </SegmentedControl>
 
-      <ColorWell value={color} onChange={onColorChange} size="small" aria-label="Custom color" />
+      <ColorWell
+        value={color}
+        onChange={onColorChange}
+        size="small"
+        className="!size-8 !rounded-lg"
+        aria-label="Custom color"
+      />
 
       <Separator orientation="vertical" />
 
@@ -505,7 +511,7 @@ function FloatingToolbar({
             <Slider
               variant="filled"
               size="small"
-              className="w-full"
+              className="!h-8 w-full !rounded-lg"
               value={[size]}
               min={MIN_SIZE}
               max={MAX_SIZE}
@@ -523,8 +529,16 @@ function FloatingToolbar({
 
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="transparent" size="small" iconOnly disabled={!canUndo} onClick={onUndo} aria-label="Undo">
-            <Undo2 className="size-4" />
+          <Button
+            variant="transparent"
+            size="small"
+            iconOnly
+            className="!size-7"
+            disabled={!canUndo}
+            onClick={onUndo}
+            aria-label="Undo"
+          >
+            <Undo2 className="size-3.5" />
           </Button>
         </TooltipTrigger>
         <TooltipContent shortcut={["⌘", "Z"]}>Undo</TooltipContent>
@@ -532,8 +546,16 @@ function FloatingToolbar({
 
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="transparent" size="small" iconOnly disabled={!canRedo} onClick={onRedo} aria-label="Redo">
-            <Redo2 className="size-4" />
+          <Button
+            variant="transparent"
+            size="small"
+            iconOnly
+            className="!size-7"
+            disabled={!canRedo}
+            onClick={onRedo}
+            aria-label="Redo"
+          >
+            <Redo2 className="size-3.5" />
           </Button>
         </TooltipTrigger>
         <TooltipContent shortcut={["⌘", "⇧", "Z"]}>Redo</TooltipContent>
@@ -541,8 +563,16 @@ function FloatingToolbar({
 
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="transparent" size="small" iconOnly disabled={!canUndo} onClick={onClear} aria-label="Clear all">
-            <Eraser className="size-4" />
+          <Button
+            variant="transparent"
+            size="small"
+            iconOnly
+            className="!size-7"
+            disabled={!canUndo}
+            onClick={onClear}
+            aria-label="Clear all"
+          >
+            <Eraser className="size-3.5" />
           </Button>
         </TooltipTrigger>
         <TooltipContent shortcut={["C"]}>Clear all</TooltipContent>
@@ -552,8 +582,8 @@ function FloatingToolbar({
 
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="transparent" size="small" iconOnly onClick={onExit} aria-label="Stop drawing">
-            <X className="size-4" />
+          <Button variant="transparent" size="small" iconOnly className="!size-7" onClick={onExit} aria-label="Stop drawing">
+            <X className="size-3.5" />
           </Button>
         </TooltipTrigger>
         <TooltipContent shortcut={["Esc"]}>Stop drawing</TooltipContent>
