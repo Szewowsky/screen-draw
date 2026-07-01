@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+/* Tell Tailwind to scan all local renderer window files for class names */
+@source "./**/*.{ts,tsx}";
+@source not "./preload.ts";
+@source not "./dev/**/*";
+
+:root {
+  color-scheme: dark;
+  --app-bg: #101010;
+  --panel: #171717;
+  --panel-muted: #1d1d1d;
+  --popover: rgb(28 28 28 / 0.96);
+  --separator: rgb(255 255 255 / 0.1);
+  --text-primary: #f7f7f7;
+  --text-secondary: #b7b7b7;
+  --text-tertiary: #888888;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+  background: var(--app-bg);
+  color: var(--text-primary);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "Segoe UI",
+    sans-serif;
+  letter-spacing: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.bg-app {
+  background: var(--app-bg);
+}
+
+.text-primary {
+  color: var(--text-primary);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-tertiary {
+  color: var(--text-tertiary);
+}
+
+.bg-popover {
+  background: var(--popover);
+}
+
+.border-separator {
+  border-color: var(--separator);
+}
+
+.rounded-panel {
+  border-radius: 10px;
+}
+
+.h-13 {
+  height: 3.25rem;
+}
+
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag,
+button,
+input,
+label {
+  -webkit-app-region: no-drag;
+}
+
+.slider-input {
+  accent-color: #ff3b30;
+}
+
+.slider-input::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.16);
+}
+
+.slider-input::-webkit-slider-thumb {
+  margin-top: -6px;
+}

@@ -1,0 +1,365 @@
+import { createContext, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactElement, type ReactNode, useContext } from "react";
+import { clsx } from "clsx";
+
+type Tone = "secondary" | "tertiary";
+
+export const toast = {
+  error: (message: string) => console.error(message),
+};
+
+export function Toaster() {
+  return null;
+}
+
+export function TooltipProvider({ children }: { children: ReactNode }) {
+  return <>{children}</>;
+}
+
+export function Tooltip({ children }: { children: ReactNode }) {
+  return <span className="group/tooltip relative inline-flex items-center">{children}</span>;
+}
+
+export function TooltipTrigger({ children }: { asChild?: boolean; children: ReactElement }) {
+  return children;
+}
+
+export function TooltipContent({ children, shortcut }: { children: ReactNode; shortcut?: string[] }) {
+  return (
+    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-zinc-950 px-2.5 py-1.5 text-xs font-medium text-zinc-100 shadow-xl group-hover/tooltip:block">
+      {children}
+      {shortcut?.length ? <span className="ml-2 text-zinc-400">{shortcut.join(" ")}</span> : null}
+    </span>
+  );
+}
+
+export function Button({
+  variant = "filled",
+  size = "medium",
+  iconOnly = false,
+  className,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: "accent" | "filled" | "transparent";
+  size?: "small" | "medium" | "large";
+  iconOnly?: boolean;
+}) {
+  return (
+    <button
+      {...props}
+      className={clsx(
+        "no-drag inline-flex shrink-0 items-center justify-center gap-2 rounded-md font-semibold transition disabled:cursor-not-allowed disabled:opacity-40",
+        variant === "accent" && "bg-red-500 text-white hover:bg-red-400 active:bg-red-600",
+        variant === "filled" && "bg-zinc-800 text-zinc-100 hover:bg-zinc-700 active:bg-zinc-900",
+        variant === "transparent" && "bg-transparent text-zinc-100 hover:bg-white/8 active:bg-white/12",
+        size === "small" && (iconOnly ? "size-8" : "h-8 px-3 text-sm"),
+        size === "medium" && (iconOnly ? "size-9" : "h-9 px-4 text-sm"),
+        size === "large" && (iconOnly ? "size-11" : "h-11 px-5 text-base"),
+        className,
+      )}
+    />
+  );
+}
+
+export function ColorWell({
+  value,
+  onChange,
+  size: _size,
+  className,
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, "onChange" | "size" | "type" | "value"> & {
+  value: string;
+  onChange: (value: string) => void;
+  size?: "small" | "medium";
+}) {
+  return (
+    <label
+      className={clsx(
+        "no-drag relative inline-flex size-9 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-white/10 shadow-inner",
+        className,
+      )}
+      style={{ backgroundColor: value }}
+    >
+      <input
+        {...props}
+        type="color"
+        value={value}
+        onChange={(event) => onChange(event.currentTarget.value)}
+        className="absolute inset-0 size-full cursor-pointer opacity-0"
+      />
+    </label>
+  );
+}
+
+export function ScrollArea({ toolbar, children }: { toolbar?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="h-screen overflow-y-auto bg-app text-primary">
+      {toolbar}
+      {children}
+    </div>
+  );
+}
+
+export function Toolbar({ children }: { children: ReactNode }) {
+  return <div className="drag-region sticky top-0 z-20 flex h-16 items-center border-b border-white/6 bg-app/90 px-5 pl-24 backdrop-blur-xl">{children}</div>;
+}
+
+export function ToolbarContent({ children }: { children: ReactNode }) {
+  return <div className="flex min-w-0 items-center gap-3">{children}</div>;
+}
+
+export function ToolbarTitle({ children }: { children: ReactNode }) {
+  return <h1 className="truncate text-lg font-bold text-zinc-50">{children}</h1>;
+}
+
+export function Text({
+  children,
+  variant,
+  color,
+  className,
+}: {
+  children: ReactNode;
+  variant?: "small";
+  color?: Tone;
+  className?: string;
+}) {
+  return (
+    <span
+      className={clsx(
+        "leading-relaxed",
+        variant === "small" ? "text-sm" : "text-base",
+        color === "secondary" && "text-secondary",
+        color === "tertiary" && "text-tertiary",
+        !color && "text-primary",
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+export function Separator({ orientation = "horizontal" }: { orientation?: "horizontal" | "vertical" }) {
+  return orientation === "vertical" ? (
+    <div className="mx-1 h-6 w-px bg-white/10" />
+  ) : (
+    <div className="h-px w-full bg-white/10" />
+  );
+}
+
+export function FieldSet({
+  title,
+  description,
+  children,
+}: {
+  title?: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="flex flex-col gap-4">
+      {title || description ? (
+        <div className="flex flex-col gap-1">
+          {title ? <h2 className="text-base font-bold text-zinc-50">{title}</h2> : null}
+          {description ? <p className="text-sm font-medium leading-snug text-zinc-400">{description}</p> : null}
+        </div>
+      ) : null}
+      <div className="overflow-hidden rounded-lg bg-zinc-900/70">{children}</div>
+    </section>
+  );
+}
+
+export function Field({
+  label,
+  orientation = "horizontal",
+  children,
+}: {
+  label?: string;
+  orientation?: "horizontal" | "vertical";
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={clsx(
+        "flex gap-4 px-4 py-4",
+        orientation === "horizontal" ? "items-center justify-between" : "flex-col",
+      )}
+    >
+      {label ? <FieldLabel>{label}</FieldLabel> : null}
+      {children}
+    </div>
+  );
+}
+
+export function FieldGroup({ children }: { children: ReactNode }) {
+  return <div className="divide-y divide-white/8">{children}</div>;
+}
+
+export function FieldContent({ children }: { children: ReactNode }) {
+  return <div className="min-w-0">{children}</div>;
+}
+
+export function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: ReactNode }) {
+  return (
+    <label htmlFor={htmlFor} className="text-sm font-bold text-zinc-50">
+      {children}
+    </label>
+  );
+}
+
+const SegmentedContext = createContext<{
+  value?: string;
+  onValueChange?: (value: string) => void;
+} | null>(null);
+
+export function SegmentedControl({
+  value,
+  onValueChange,
+  children,
+  className,
+}: {
+  type?: "single";
+  size?: "small";
+  value?: string;
+  onValueChange?: (value: string) => void;
+  children: ReactNode;
+  className?: string;
+  "aria-label"?: string;
+}) {
+  return (
+    <SegmentedContext.Provider value={{ value, onValueChange }}>
+      <div className={clsx("no-drag inline-flex items-center rounded-lg bg-zinc-800/90 p-1", className)}>{children}</div>
+    </SegmentedContext.Provider>
+  );
+}
+
+export function SegmentedControlItem({
+  value,
+  children,
+  iconOnly,
+  className,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  value: string;
+  iconOnly?: boolean;
+}) {
+  const context = useContext(SegmentedContext);
+  const selected = context?.value === value;
+
+  return (
+    <button
+      {...props}
+      type="button"
+      aria-pressed={selected}
+      onClick={(event) => {
+        props.onClick?.(event);
+        context?.onValueChange?.(value);
+      }}
+      className={clsx(
+        "inline-flex shrink-0 items-center justify-center rounded-md text-zinc-200 transition hover:bg-white/8",
+        iconOnly ? "size-8" : "h-8 px-3 text-sm font-semibold",
+        selected && "bg-red-500/95 text-white shadow-sm hover:bg-red-500",
+        className,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function Slider({
+  value,
+  min,
+  max,
+  step,
+  onValueChange,
+  startContent,
+  endContent,
+  className,
+}: {
+  variant?: "filled";
+  size?: "small";
+  value: number[];
+  min: number;
+  max: number;
+  step?: number;
+  onValueChange: (value: number[]) => void;
+  startContent?: ReactNode;
+  endContent?: (value: number) => ReactNode;
+  className?: string;
+  "aria-label"?: string;
+}) {
+  const current = value[0] ?? min;
+
+  return (
+    <div className={clsx("no-drag flex h-8 items-center gap-2 rounded-lg bg-zinc-800 px-3 text-zinc-50", className)}>
+      {startContent ? <span className="text-zinc-100">{startContent}</span> : null}
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={current}
+        onChange={(event) => onValueChange([Number(event.currentTarget.value)])}
+        className="slider-input min-w-0 flex-1"
+      />
+      {endContent ? <span className="min-w-5 text-right text-sm font-bold">{endContent(current)}</span> : null}
+    </div>
+  );
+}
+
+export function Key({ children }: { children: ReactNode }) {
+  return (
+    <kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-white/10 bg-zinc-950/50 px-1.5 text-xs font-bold text-zinc-400">
+      {children}
+    </kbd>
+  );
+}
+
+export function KeyGroup({ children }: { children: ReactNode }) {
+  return <span className="inline-flex items-center gap-1">{children}</span>;
+}
+
+export function RadioGroup({
+  value,
+  onValueChange,
+  children,
+}: {
+  value?: string;
+  onValueChange?: (value: string) => void;
+  orientation?: "horizontal";
+  children: ReactNode;
+}) {
+  return (
+    <SegmentedContext.Provider value={{ value, onValueChange }}>
+      <div className="no-drag flex items-center gap-2">{children}</div>
+    </SegmentedContext.Provider>
+  );
+}
+
+export function RadioGroupItem({ value }: { value: string }) {
+  const context = useContext(SegmentedContext);
+  const selected = context?.value === value;
+
+  return (
+    <span
+      aria-hidden
+      onClick={() => context?.onValueChange?.(value)}
+      className={clsx(
+        "inline-flex size-4 rounded-full border border-zinc-500",
+        selected && "border-red-400 bg-red-500 shadow-[inset_0_0_0_3px_rgba(24,24,27,1)]",
+      )}
+    />
+  );
+}
+
+export function Label({ children }: { children: ReactNode }) {
+  return <span className="no-drag inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-zinc-200">{children}</span>;
+}
+
+export function ErrorBoundaryView() {
+  return (
+    <div className="flex h-screen items-center justify-center bg-app px-6 text-center text-sm font-semibold text-red-300">
+      Something went wrong.
+    </div>
+  );
+}
