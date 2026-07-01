@@ -9,33 +9,44 @@
 import { globalShortcut } from "electron";
 
 import { toggleOverlay } from "../windows/overlay-window.js";
+import { broadcast } from "./events.js";
+import {
+  initialShortcutStatus,
+  recordRegistrationResult,
+  type ShortcutStatus,
+} from "./shortcut-status.js";
 import { logger } from "../logger.js";
 
-let currentAccelerator: string | null = null;
+let status: ShortcutStatus = initialShortcutStatus();
 
 export async function registerToggleShortcut(accelerator: string): Promise<boolean> {
   globalShortcut.unregisterAll();
-  currentAccelerator = null;
 
+  let ok = false;
   try {
-    const ok = await globalShortcut.register(accelerator, () => {
+    ok = await globalShortcut.register(accelerator, () => {
       void toggleOverlay();
     });
 
     if (ok) {
-      currentAccelerator = accelerator;
       logger.info("shortcut", `Registered toggle shortcut: ${accelerator}`);
     } else {
       logger.error("shortcut", `Failed to register toggle shortcut: ${accelerator}`);
     }
-
-    return ok;
   } catch (error) {
     logger.error("shortcut", `Error registering toggle shortcut: ${accelerator}`, error);
-    return false;
   }
+
+  status = recordRegistrationResult(accelerator, ok);
+  // Surface the result in the control panel (registration also happens at startup).
+  broadcast("shortcut:status-changed", status);
+  return ok;
+}
+
+export function getShortcutStatus(): ShortcutStatus {
+  return status;
 }
 
 export function getRegisteredShortcut(): string | null {
-  return currentAccelerator;
+  return status.registeredAccelerator;
 }

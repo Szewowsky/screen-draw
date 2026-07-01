@@ -34,6 +34,11 @@ export interface ScreenDrawSettings {
   recentColors: string[];
 }
 
+export interface ShortcutStatus {
+  registeredAccelerator: string | null;
+  failedAccelerator: string | null;
+}
+
 /** True when `color` is one of the built-in palette swatches. */
 export function isPaletteColor(color: string): boolean {
   return PALETTE.some((c) => c.value.toLowerCase() === color.toLowerCase());

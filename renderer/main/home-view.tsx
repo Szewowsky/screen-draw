@@ -18,13 +18,14 @@ import {
   ToolbarTitle,
   toast,
 } from "../components/ui";
-import { Pencil } from "lucide-react";
+import { Pencil, TriangleAlert } from "lucide-react";
 import {
   MAX_SIZE,
   MIN_SIZE,
   PALETTE,
   isPaletteColor,
   type ScreenDrawSettings,
+  type ShortcutStatus,
 } from "../overlay/constants";
 
 const SHORTCUT_ROWS: { label: string; keys: ReactNode }[] = [
@@ -136,12 +137,33 @@ export function HomeView() {
     queryFn: () => window.screenDraw.ipc.invoke<ScreenDrawSettings>("settings:get"),
   });
 
+  const { data: shortcutStatus } = useQuery({
+    queryKey: ["shortcutStatus"],
+    queryFn: () => window.screenDraw.ipc.invoke<ShortcutStatus>("shortcut:getStatus"),
+  });
+
   const shortcutMutation = useMutation({
     mutationFn: (shortcut: string) =>
-      window.screenDraw.ipc.invoke<ScreenDrawSettings>("settings:setShortcut", shortcut),
-    onSuccess: (next) => queryClient.setQueryData(["settings"], next),
+      window.screenDraw.ipc.invoke<{
+        settings: ScreenDrawSettings;
+        registered: boolean;
+        status: ShortcutStatus;
+      }>("settings:setShortcut", shortcut),
+    onSuccess: (next) => {
+      queryClient.setQueryData(["settings"], next.settings);
+      queryClient.setQueryData(["shortcutStatus"], next.status);
+    },
     onError: (error) => toast.error(`Couldn't register shortcut: ${error}`),
   });
+
+  // Startup registration failures are broadcast before this window loads, so the
+  // initial query covers them; this keeps later changes in sync.
+  useEffect(() => {
+    const unsub = window.screenDraw.ipc.on("shortcut:status-changed", (params) => {
+      queryClient.setQueryData(["shortcutStatus"], params as ShortcutStatus);
+    });
+    return () => unsub();
+  }, [queryClient]);
 
   const defaultsMutation = useMutation({
     mutationFn: (partial: { defaultColor?: string; defaultSize?: number; recentColor?: string }) =>
@@ -248,6 +270,18 @@ export function HomeView() {
               </div>
             )}
           </Field>
+          {shortcutStatus?.failedAccelerator ? (
+            <div
+              role="alert"
+              className="flex items-center gap-2.5 border-t border-white/8 px-7 py-4 text-[13px] font-semibold leading-snug text-amber-400"
+            >
+              <TriangleAlert className="size-4 shrink-0" />
+              <span>
+                Couldn't register <ShortcutKeys accelerator={shortcutStatus.failedAccelerator} /> —
+                another app may already be using it. Choose a different shortcut.
+              </span>
+            </div>
+          ) : null}
         </FieldSet>
 
         <FieldSet

@@ -15,7 +15,7 @@ import {
   type ScreenDrawSettings,
 } from "../services/settings-store.js";
 import { broadcast } from "../services/events.js";
-import { registerToggleShortcut } from "../services/shortcut.js";
+import { getShortcutStatus, registerToggleShortcut } from "../services/shortcut.js";
 import {
   getActiveDisplayId,
   isOverlayActive,
@@ -48,18 +48,19 @@ export function registerOverlayHandlers(): void {
     return getSettings();
   });
 
-  ipcMain.handle(
-    "settings:setShortcut",
-    async (_event, shortcut: unknown): Promise<ScreenDrawSettings> => {
-      if (typeof shortcut !== "string") {
-        throw new Error("settings:setShortcut expects a string accelerator");
-      }
-      const next = setShortcut(shortcut);
-      await registerToggleShortcut(next.shortcut);
-      broadcast("settings:changed", next);
-      return next;
-    },
-  );
+  ipcMain.handle("settings:setShortcut", async (_event, shortcut: unknown) => {
+    if (typeof shortcut !== "string") {
+      throw new Error("settings:setShortcut expects a string accelerator");
+    }
+    const next = setShortcut(shortcut);
+    const registered = await registerToggleShortcut(next.shortcut);
+    broadcast("settings:changed", next);
+    return { settings: next, registered, status: getShortcutStatus() };
+  });
+
+  ipcMain.handle("shortcut:getStatus", async () => {
+    return getShortcutStatus();
+  });
 
   ipcMain.handle(
     "settings:setDefaults",
