@@ -175,18 +175,48 @@ export function OverlayView() {
   colorRef.current = color;
   sizeRef.current = size;
 
+  // Committed shapes are rasterized once into this offscreen layer and
+  // re-rasterized only when the committed set changes (model revision) or the
+  // canvas is resized. Per pointer event only the bitmap is blitted and the
+  // in-progress shape painted on top.
+  const committedLayerRef = useRef<{ canvas: HTMLCanvasElement; revision: number } | null>(null);
+
   const redraw = useCallback(() => {
     const ctx = ctxRef.current;
     const canvas = canvasRef.current;
     if (!ctx || !canvas) return;
+    const model = modelRef.current;
+
+    let layer = committedLayerRef.current;
+    const stale =
+      !layer ||
+      layer.revision !== model.revision ||
+      layer.canvas.width !== canvas.width ||
+      layer.canvas.height !== canvas.height;
+    if (stale) {
+      const off = layer?.canvas ?? document.createElement("canvas");
+      off.width = canvas.width;
+      off.height = canvas.height;
+      const offCtx = off.getContext("2d");
+      if (!offCtx) return;
+      // Same device-pixel dimensions and DPR transform as the main canvas, so
+      // the blit below is pixel-identical to painting the shapes directly.
+      offCtx.clearRect(0, 0, off.width, off.height);
+      const dpr = window.devicePixelRatio || 1;
+      offCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      for (const shape of model.shapes) {
+        drawShape(offCtx, shape);
+      }
+      layer = { canvas: off, revision: model.revision };
+      committedLayerRef.current = layer;
+    }
+    if (!layer) return;
+
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(layer.canvas, 0, 0);
     ctx.restore();
-    const model = modelRef.current;
-    for (const shape of model.shapes) {
-      drawShape(ctx, shape);
-    }
     if (model.current) {
       drawShape(ctx, model.current);
     }

@@ -35,10 +35,16 @@ export interface DrawingModel {
   readonly current: Shape | null;
   readonly undoStack: readonly (readonly Shape[])[];
   readonly redoStack: readonly (readonly Shape[])[];
+  /**
+   * Bumped whenever the committed shape set changes (commit, undo, redo,
+   * clear). Renderers cache a rasterized committed layer and rebuild it only
+   * when this changes; in-progress updates leave it untouched.
+   */
+  readonly revision: number;
 }
 
 export function createModel(): DrawingModel {
-  return { shapes: [], current: null, undoStack: [], redoStack: [] };
+  return { shapes: [], current: null, undoStack: [], redoStack: [], revision: 0 };
 }
 
 /** Apply the Shift-key constraint to a shape's end point (45° snap for lines, square/circle for boxes). */
@@ -102,6 +108,7 @@ export function commitShape(model: DrawingModel): DrawingModel {
     current: null,
     undoStack: pushHistory(model.undoStack, model.shapes),
     redoStack: [],
+    revision: model.revision + 1,
   };
 }
 
@@ -113,6 +120,7 @@ export function undo(model: DrawingModel): DrawingModel {
     shapes: snapshot,
     undoStack: model.undoStack.slice(0, -1),
     redoStack: [...model.redoStack, model.shapes],
+    revision: model.revision + 1,
   };
 }
 
@@ -124,6 +132,7 @@ export function redo(model: DrawingModel): DrawingModel {
     shapes: snapshot,
     undoStack: pushHistory(model.undoStack, model.shapes),
     redoStack: model.redoStack.slice(0, -1),
+    revision: model.revision + 1,
   };
 }
 
@@ -135,6 +144,7 @@ export function clearAll(model: DrawingModel): DrawingModel {
     shapes: [],
     undoStack: pushHistory(model.undoStack, model.shapes),
     redoStack: [],
+    revision: model.revision + 1,
   };
 }
 

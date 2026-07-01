@@ -200,6 +200,46 @@ describe("undo/redo", () => {
   });
 });
 
+describe("committed-layer invalidation (revision)", () => {
+  const stroke: Point[] = [
+    { x: 0, y: 0 },
+    { x: 10, y: 10 },
+  ];
+
+  it("does not change while a shape is in progress (layer can be reused per pointermove)", () => {
+    let model = createModel();
+    const before = model.revision;
+    model = startShape(model, PEN, stroke[0]);
+    model = updateShape(model, stroke[1], false);
+    expect(model.revision).toBe(before);
+  });
+
+  it("changes when the committed set changes: commit, undo, redo, clear", () => {
+    let model = drawStroke(createModel(), stroke);
+    const afterCommit = model.revision;
+    expect(afterCommit).not.toBe(createModel().revision);
+
+    model = undo(model);
+    const afterUndo = model.revision;
+    expect(afterUndo).not.toBe(afterCommit);
+
+    model = redo(model);
+    const afterRedo = model.revision;
+    expect(afterRedo).not.toBe(afterUndo);
+
+    model = clearAll(model);
+    expect(model.revision).not.toBe(afterRedo);
+  });
+
+  it("does not change on no-op transitions", () => {
+    const empty = createModel();
+    expect(undo(empty).revision).toBe(empty.revision);
+    expect(redo(empty).revision).toBe(empty.revision);
+    expect(clearAll(empty).revision).toBe(empty.revision);
+    expect(commitShape(empty).revision).toBe(empty.revision);
+  });
+});
+
 describe("bounds", () => {
   it("returns null for a shape with no points", () => {
     const shape: Shape = { ...PEN, points: [] };
