@@ -1,4 +1,13 @@
-import { createContext, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactElement, type ReactNode, useContext } from "react";
+import {
+  createContext,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactElement,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useRef,
+} from "react";
 import { clsx } from "clsx";
 
 type Tone = "secondary" | "tertiary";
@@ -53,7 +62,7 @@ export function Button({
         variant === "transparent" && "bg-transparent text-zinc-100 hover:bg-white/8 active:bg-white/12",
         size === "small" && (iconOnly ? "size-8" : "h-8 px-3 text-sm"),
         size === "medium" && (iconOnly ? "size-9" : "h-9 px-4 text-sm"),
-        size === "large" && (iconOnly ? "size-11" : "h-14 px-6 text-lg"),
+        size === "large" && (iconOnly ? "size-10" : "h-12 px-5 text-base"),
         className,
       )}
     />
@@ -91,8 +100,14 @@ export function ColorWell({
 }
 
 export function ScrollArea({ toolbar, children }: { toolbar?: ReactNode; children: ReactNode }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, []);
+
   return (
-    <div className="h-screen overflow-y-auto bg-app text-primary">
+    <div ref={scrollRef} className="h-screen overflow-y-auto bg-app text-primary">
       {toolbar}
       {children}
     </div>
@@ -101,7 +116,7 @@ export function ScrollArea({ toolbar, children }: { toolbar?: ReactNode; childre
 
 export function Toolbar({ children }: { children: ReactNode }) {
   return (
-    <div className="drag-region sticky top-0 z-20 flex h-20 items-center bg-app/95 px-8 pl-24 backdrop-blur-xl">
+    <div className="drag-region sticky top-0 z-20 flex h-[72px] items-center justify-center bg-app/95 px-7 backdrop-blur-xl">
       {children}
     </div>
   );
@@ -112,7 +127,7 @@ export function ToolbarContent({ children }: { children: ReactNode }) {
 }
 
 export function ToolbarTitle({ children }: { children: ReactNode }) {
-  return <h1 className="truncate text-[22px] font-bold leading-none text-zinc-50">{children}</h1>;
+  return <h1 className="truncate text-[21px] font-bold leading-none text-zinc-50">{children}</h1>;
 }
 
 export function Text({
@@ -130,7 +145,7 @@ export function Text({
     <span
       className={clsx(
         "leading-relaxed",
-        variant === "small" ? "text-sm font-semibold" : "text-[17px] font-semibold",
+        variant === "small" ? "text-[13px] font-semibold" : "text-[16px] font-semibold",
         color === "secondary" && "text-secondary",
         color === "tertiary" && "text-tertiary",
         !color && "text-primary",
@@ -144,7 +159,7 @@ export function Text({
 
 export function Separator({ orientation = "horizontal" }: { orientation?: "horizontal" | "vertical" }) {
   return orientation === "vertical" ? (
-    <div className="mx-0.5 h-5 w-px bg-white/10" />
+    <div className="mx-0.5 h-4 w-px bg-white/10" />
   ) : (
     <div className="h-px w-full bg-white/10" />
   );
@@ -160,14 +175,14 @@ export function FieldSet({
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-5">
+    <section className="flex flex-col gap-4">
       {title || description ? (
         <div className="flex flex-col gap-1">
-          {title ? <h2 className="text-xl font-bold leading-tight text-zinc-50">{title}</h2> : null}
-          {description ? <p className="text-base font-semibold leading-snug text-zinc-400">{description}</p> : null}
+          {title ? <h2 className="text-[19px] font-bold leading-tight text-zinc-50">{title}</h2> : null}
+          {description ? <p className="text-[15px] font-semibold leading-snug text-zinc-400">{description}</p> : null}
         </div>
       ) : null}
-      <div className="overflow-hidden rounded-[20px] bg-[#181818] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+      <div className="overflow-hidden rounded-[18px] bg-[#181818] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
         {children}
       </div>
     </section>
@@ -186,7 +201,7 @@ export function Field({
   return (
     <div
       className={clsx(
-        "flex gap-4 px-8 py-6",
+        "flex gap-4 px-7 py-5",
         orientation === "horizontal" ? "items-center justify-between" : "flex-col",
       )}
     >
@@ -206,7 +221,7 @@ export function FieldContent({ children }: { children: ReactNode }) {
 
 export function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: ReactNode }) {
   return (
-    <label htmlFor={htmlFor} className="text-[18px] font-bold leading-none text-zinc-50">
+    <label htmlFor={htmlFor} className="text-[17px] font-bold leading-none text-zinc-50">
       {children}
     </label>
   );
@@ -283,6 +298,7 @@ export function Slider({
   startContent,
   endContent,
   className,
+  endContentClassName,
 }: {
   variant?: "filled";
   size?: "small";
@@ -294,6 +310,7 @@ export function Slider({
   startContent?: ReactNode;
   endContent?: (value: number) => ReactNode;
   className?: string;
+  endContentClassName?: string;
   "aria-label"?: string;
 }) {
   const current = value[0] ?? min;
@@ -315,14 +332,23 @@ export function Slider({
         onChange={(event) => onValueChange([Number(event.currentTarget.value)])}
         className="absolute inset-0 z-20 cursor-pointer opacity-0"
       />
-      {endContent ? <span className="pointer-events-none relative z-10 ml-auto min-w-9 pr-4 text-right text-base font-bold">{endContent(current)}</span> : null}
+      {endContent ? (
+        <span
+          className={clsx(
+            "pointer-events-none relative z-10 ml-auto min-w-9 pr-4 text-right text-base font-bold",
+            endContentClassName,
+          )}
+        >
+          {endContent(current)}
+        </span>
+      ) : null}
     </div>
   );
 }
 
 export function Key({ children }: { children: ReactNode }) {
   return (
-    <kbd className="inline-flex h-7 min-w-7 items-center justify-center rounded-lg border border-white/10 bg-[#1d1d1d] px-1.5 text-[13px] font-bold leading-none text-zinc-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+    <kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-white/10 bg-[#1d1d1d] px-1.5 text-[12px] font-bold leading-none text-zinc-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       {children}
     </kbd>
   );

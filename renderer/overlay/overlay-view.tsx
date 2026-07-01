@@ -430,7 +430,7 @@ function FloatingToolbar({
     <div
       ref={barRef}
       className={
-        "fixed z-30 flex h-10 items-center gap-1 rounded-[13px] border border-white/10 bg-[#1d1d1f]/95 px-2 shadow-[0_12px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl" +
+        "fixed z-30 flex h-9 items-center gap-0.5 rounded-[12px] border border-white/10 bg-[#1d1d1f]/95 px-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl" +
         (pos ? "" : " bottom-[88px] left-1/2 -translate-x-1/2")
       }
       style={pos ? { left: pos.x, top: pos.y } : undefined}
@@ -441,7 +441,7 @@ function FloatingToolbar({
             type="button"
             aria-label="Move toolbar"
             onPointerDown={onGripDown}
-            className="flex h-7 w-5 cursor-grab items-center justify-center text-tertiary active:cursor-grabbing"
+            className="flex h-6 w-4 cursor-grab items-center justify-center text-tertiary active:cursor-grabbing"
           >
             <GripVertical className="size-3.5" />
           </button>
@@ -455,6 +455,7 @@ function FloatingToolbar({
         type="single"
         size="small"
         value={tool}
+        className="!rounded-[11px] !p-1"
         onValueChange={(value) => {
           if (typeof value === "string" && value) onToolChange(value as DrawTool);
         }}
@@ -463,7 +464,7 @@ function FloatingToolbar({
         {TOOLS.map(({ tool: t, label, key, Icon }) => (
           <Tooltip key={t}>
             <TooltipTrigger asChild>
-              <SegmentedControlItem value={t} iconOnly className="!size-7 !rounded-lg" aria-label={label}>
+              <SegmentedControlItem value={t} iconOnly className="!size-6 !rounded-md" aria-label={label}>
                 <Icon className="size-3.5" />
               </SegmentedControlItem>
             </TooltipTrigger>
@@ -478,6 +479,7 @@ function FloatingToolbar({
         type="single"
         size="small"
         value={color}
+        className="!rounded-[11px] !p-1"
         onValueChange={(value) => {
           if (typeof value === "string" && value) onColorChange(value);
         }}
@@ -486,8 +488,8 @@ function FloatingToolbar({
         {PALETTE.map((c, i) => (
           <Tooltip key={c.value}>
             <TooltipTrigger asChild>
-              <SegmentedControlItem value={c.value} iconOnly className="!size-7 !rounded-lg" aria-label={c.name}>
-                <span className="size-4 rounded-full" style={{ backgroundColor: c.value }} />
+              <SegmentedControlItem value={c.value} iconOnly className="!size-6 !rounded-md" aria-label={c.name}>
+                <span className="size-3.5 rounded-full" style={{ backgroundColor: c.value }} />
               </SegmentedControlItem>
             </TooltipTrigger>
             <TooltipContent shortcut={[String(i + 1)]}>{c.name}</TooltipContent>
@@ -499,7 +501,7 @@ function FloatingToolbar({
         value={color}
         onChange={onColorChange}
         size="small"
-        className="!size-8 !rounded-lg"
+        className="!size-7 !rounded-md"
         aria-label="Custom color"
       />
 
@@ -507,17 +509,18 @@ function FloatingToolbar({
 
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="w-20">
+          <span className="w-[68px]">
             <Slider
               variant="filled"
               size="small"
-              className="!h-8 w-full !rounded-lg"
+              className="!h-7 w-full !rounded-md"
               value={[size]}
               min={MIN_SIZE}
               max={MAX_SIZE}
               step={1}
               onValueChange={(value) => onSizeChange(value[0])}
               endContent={(v) => <span className="tabular-nums">{v}</span>}
+              endContentClassName="!min-w-7 !pr-2.5 !text-sm"
               aria-label="Brush size"
             />
           </span>
@@ -533,7 +536,7 @@ function FloatingToolbar({
             variant="transparent"
             size="small"
             iconOnly
-            className="!size-7"
+            className="!size-6"
             disabled={!canUndo}
             onClick={onUndo}
             aria-label="Undo"
@@ -550,7 +553,7 @@ function FloatingToolbar({
             variant="transparent"
             size="small"
             iconOnly
-            className="!size-7"
+            className="!size-6"
             disabled={!canRedo}
             onClick={onRedo}
             aria-label="Redo"
@@ -567,7 +570,7 @@ function FloatingToolbar({
             variant="transparent"
             size="small"
             iconOnly
-            className="!size-7"
+            className="!size-6"
             disabled={!canUndo}
             onClick={onClear}
             aria-label="Clear all"
@@ -582,7 +585,7 @@ function FloatingToolbar({
 
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="transparent" size="small" iconOnly className="!size-7" onClick={onExit} aria-label="Stop drawing">
+          <Button variant="transparent" size="small" iconOnly className="!size-6" onClick={onExit} aria-label="Stop drawing">
             <X className="size-3.5" />
           </Button>
         </TooltipTrigger>

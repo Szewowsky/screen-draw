@@ -189,15 +189,15 @@ export function HomeView() {
         </Toolbar>
       }
     >
-      <div className="flex flex-col gap-10 px-8 pb-10">
-        <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-8 px-7 pb-8">
+        <div className="flex flex-col gap-4">
           <Text color="secondary">
             Draw, highlight, and point anywhere on your screen — ideal for tutorials and screen recordings.
           </Text>
           <Button variant="accent" size="large" className="w-full" onClick={toggleDrawing}>
             {active ? "Stop drawing" : "Start drawing"}
           </Button>
-          <div className="flex items-center justify-center gap-2 pt-1">
+          <div className="flex items-center justify-center gap-2">
             <Text variant="small" color="tertiary">
               or press
             </Text>
@@ -274,7 +274,7 @@ export function HomeView() {
           title="Keyboard shortcuts"
           description="Available while drawing mode is on. Hover any toolbar control to see its key."
         >
-          <div className="flex flex-col gap-3 px-8 py-6">
+          <div className="flex flex-col gap-2.5 px-7 py-5">
             {SHORTCUT_ROWS.map((row) => (
               <div key={row.label} className="flex items-center justify-between gap-4">
                 <Text variant="small" color="secondary">
