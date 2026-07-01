@@ -170,6 +170,7 @@ function setupTray() {
   );
   icon.setTemplateImage(true);
   tray = new Tray(icon);
+  tray.setTitle("✎");
   tray.setToolTip("Screen Draw");
 
   const trayMenu = Menu.buildFromTemplate([
