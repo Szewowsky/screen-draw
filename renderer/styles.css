@@ -35,6 +35,12 @@ body,
   letter-spacing: 0;
 }
 
+html.no-background,
+html.no-background body,
+html.no-background #root {
+  background: transparent;
+}
+
 button,
 input,
 select,
@@ -86,7 +92,7 @@ label {
 }
 
 .slider-input {
-  accent-color: #ff3b30;
+  accent-color: #ff8517;
 }
 
 .slider-input::-webkit-slider-runnable-track {

@@ -48,7 +48,7 @@ export function Button({
       {...props}
       className={clsx(
         "no-drag inline-flex shrink-0 items-center justify-center gap-2 rounded-md font-semibold transition disabled:cursor-not-allowed disabled:opacity-40",
-        variant === "accent" && "bg-red-500 text-white hover:bg-red-400 active:bg-red-600",
+        variant === "accent" && "rounded-full bg-orange-500 text-white shadow-sm hover:bg-orange-400 active:bg-orange-600",
         variant === "filled" && "bg-zinc-800 text-zinc-100 hover:bg-zinc-700 active:bg-zinc-900",
         variant === "transparent" && "bg-transparent text-zinc-100 hover:bg-white/8 active:bg-white/12",
         size === "small" && (iconOnly ? "size-8" : "h-8 px-3 text-sm"),
@@ -100,7 +100,11 @@ export function ScrollArea({ toolbar, children }: { toolbar?: ReactNode; childre
 }
 
 export function Toolbar({ children }: { children: ReactNode }) {
-  return <div className="drag-region sticky top-0 z-20 flex h-16 items-center border-b border-white/6 bg-app/90 px-5 pl-24 backdrop-blur-xl">{children}</div>;
+  return (
+    <div className="drag-region sticky top-0 z-20 flex h-[72px] items-center bg-app/95 px-5 pl-24 backdrop-blur-xl">
+      {children}
+    </div>
+  );
 }
 
 export function ToolbarContent({ children }: { children: ReactNode }) {
@@ -257,7 +261,7 @@ export function SegmentedControlItem({
       className={clsx(
         "inline-flex shrink-0 items-center justify-center rounded-md text-zinc-200 transition hover:bg-white/8",
         iconOnly ? "size-8" : "h-8 px-3 text-sm font-semibold",
-        selected && "bg-red-500/95 text-white shadow-sm hover:bg-red-500",
+        selected && "bg-orange-500/95 text-white shadow-sm hover:bg-orange-500",
         className,
       )}
     >
@@ -346,7 +350,7 @@ export function RadioGroupItem({ value }: { value: string }) {
       onClick={() => context?.onValueChange?.(value)}
       className={clsx(
         "inline-flex size-4 rounded-full border border-zinc-500",
-        selected && "border-red-400 bg-red-500 shadow-[inset_0_0_0_3px_rgba(24,24,27,1)]",
+        selected && "border-orange-400 bg-orange-500 shadow-[inset_0_0_0_3px_rgba(24,24,27,1)]",
       )}
     />
   );

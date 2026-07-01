@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  base: "./",
   plugins: [react(), tailwindcss()],
   build: {
     outDir: "build",
