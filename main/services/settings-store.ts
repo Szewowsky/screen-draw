@@ -36,13 +36,18 @@ let cached: ScreenDrawSettings | null = null;
 function coerce(raw: unknown): ScreenDrawSettings {
   const value = (raw ?? {}) as Partial<Record<keyof ScreenDrawSettings, unknown>>;
   return {
-    shortcut: typeof value.shortcut === "string" && value.shortcut.trim() ? value.shortcut : DEFAULT_SETTINGS.shortcut,
+    shortcut:
+      typeof value.shortcut === "string" && value.shortcut.trim()
+        ? value.shortcut
+        : DEFAULT_SETTINGS.shortcut,
     defaultColor:
       typeof value.defaultColor === "string" && value.defaultColor.trim()
         ? value.defaultColor
         : DEFAULT_SETTINGS.defaultColor,
     defaultSize:
-      typeof value.defaultSize === "number" && Number.isFinite(value.defaultSize) && value.defaultSize > 0
+      typeof value.defaultSize === "number" &&
+      Number.isFinite(value.defaultSize) &&
+      value.defaultSize > 0
         ? value.defaultSize
         : DEFAULT_SETTINGS.defaultSize,
   };
@@ -87,7 +92,10 @@ export function setShortcut(shortcut: string): ScreenDrawSettings {
   return getSettings();
 }
 
-export function setDefaults(partial: { defaultColor?: string; defaultSize?: number }): ScreenDrawSettings {
+export function setDefaults(partial: {
+  defaultColor?: string;
+  defaultSize?: number;
+}): ScreenDrawSettings {
   const current = getSettings();
   persist(
     coerce({

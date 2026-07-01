@@ -4,7 +4,8 @@ type IpcListener = (params: unknown) => void;
 
 const screenDrawAPI = {
   ipc: {
-    invoke: <T = unknown>(channel: string, ...args: unknown[]): Promise<T> => ipcRenderer.invoke(channel, ...args),
+    invoke: <T = unknown>(channel: string, ...args: unknown[]): Promise<T> =>
+      ipcRenderer.invoke(channel, ...args),
     send: (channel: string, ...args: unknown[]): void => ipcRenderer.send(channel, ...args),
     on: (channel: string, callback: IpcListener): (() => void) => {
       const listener = (_event: Electron.IpcRendererEvent, params: unknown) => callback(params);
@@ -14,8 +15,10 @@ const screenDrawAPI = {
   },
 
   nativeTheme: {
-    getInfo: (): Promise<{ themeSource: "system" | "light" | "dark"; shouldUseDarkColors: boolean }> =>
-      ipcRenderer.invoke("nativeTheme:getInfo"),
+    getInfo: (): Promise<{
+      themeSource: "system" | "light" | "dark";
+      shouldUseDarkColors: boolean;
+    }> => ipcRenderer.invoke("nativeTheme:getInfo"),
     setThemeSource: (source: "system" | "light" | "dark"): Promise<boolean> =>
       ipcRenderer.invoke("nativeTheme:setThemeSource", source),
   },

@@ -32,7 +32,13 @@ export function TooltipTrigger({ children }: { asChild?: boolean; children: Reac
   return children;
 }
 
-export function TooltipContent({ children, shortcut }: { children: ReactNode; shortcut?: string[] }) {
+export function TooltipContent({
+  children,
+  shortcut,
+}: {
+  children: ReactNode;
+  shortcut?: string[];
+}) {
   return (
     <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-zinc-950 px-2.5 py-1.5 text-xs font-medium text-zinc-100 shadow-xl group-hover/tooltip:block">
       {children}
@@ -57,9 +63,11 @@ export function Button({
       {...props}
       className={clsx(
         "no-drag inline-flex shrink-0 items-center justify-center gap-2 rounded-md font-semibold transition disabled:cursor-not-allowed disabled:opacity-40",
-        variant === "accent" && "rounded-full bg-orange-500 text-white shadow-sm hover:bg-orange-400 active:bg-orange-600",
+        variant === "accent" &&
+          "rounded-full bg-orange-500 text-white shadow-sm hover:bg-orange-400 active:bg-orange-600",
         variant === "filled" && "bg-zinc-800 text-zinc-100 hover:bg-zinc-700 active:bg-zinc-900",
-        variant === "transparent" && "bg-transparent text-zinc-100 hover:bg-white/8 active:bg-white/12",
+        variant === "transparent" &&
+          "bg-transparent text-zinc-100 hover:bg-white/8 active:bg-white/12",
         size === "small" && (iconOnly ? "size-8" : "h-8 px-3 text-sm"),
         size === "medium" && (iconOnly ? "size-9" : "h-9 px-4 text-sm"),
         size === "large" && (iconOnly ? "size-10" : "h-12 px-5 text-base"),
@@ -157,7 +165,11 @@ export function Text({
   );
 }
 
-export function Separator({ orientation = "horizontal" }: { orientation?: "horizontal" | "vertical" }) {
+export function Separator({
+  orientation = "horizontal",
+}: {
+  orientation?: "horizontal" | "vertical";
+}) {
   return orientation === "vertical" ? (
     <div className="mx-0.5 h-4 w-px bg-white/10" />
   ) : (
@@ -178,8 +190,12 @@ export function FieldSet({
     <section className="flex flex-col gap-4">
       {title || description ? (
         <div className="flex flex-col gap-1">
-          {title ? <h2 className="text-[19px] font-bold leading-tight text-zinc-50">{title}</h2> : null}
-          {description ? <p className="text-[15px] font-semibold leading-snug text-zinc-400">{description}</p> : null}
+          {title ? (
+            <h2 className="text-[19px] font-bold leading-tight text-zinc-50">{title}</h2>
+          ) : null}
+          {description ? (
+            <p className="text-[15px] font-semibold leading-snug text-zinc-400">{description}</p>
+          ) : null}
         </div>
       ) : null}
       <div className="overflow-hidden rounded-[18px] bg-[#181818] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
@@ -248,7 +264,12 @@ export function SegmentedControl({
 }) {
   return (
     <SegmentedContext.Provider value={{ value, onValueChange }}>
-      <div className={clsx("no-drag inline-flex items-center rounded-[14px] bg-[#242424] p-1.5", className)}>
+      <div
+        className={clsx(
+          "no-drag inline-flex items-center rounded-[14px] bg-[#242424] p-1.5",
+          className,
+        )}
+      >
         {children}
       </div>
     </SegmentedContext.Provider>
@@ -317,12 +338,21 @@ export function Slider({
   const fill = Math.min(100, Math.max(0, ((current - min) / (max - min)) * 100));
 
   return (
-    <div className={clsx("no-drag relative flex h-11 items-center overflow-hidden rounded-xl bg-[#242424] text-zinc-50", className)}>
+    <div
+      className={clsx(
+        "no-drag relative flex h-11 items-center overflow-hidden rounded-xl bg-[#242424] text-zinc-50",
+        className,
+      )}
+    >
       <span
         className="pointer-events-none absolute inset-y-0 left-0 bg-[#5d3924]/55"
         style={{ width: `${Math.max(18, fill)}%` }}
       />
-      {startContent ? <span className="pointer-events-none relative z-10 flex h-full w-12 items-center justify-center text-zinc-100">{startContent}</span> : null}
+      {startContent ? (
+        <span className="pointer-events-none relative z-10 flex h-full w-12 items-center justify-center text-zinc-100">
+          {startContent}
+        </span>
+      ) : null}
       <input
         type="range"
         min={min}
@@ -392,7 +422,11 @@ export function RadioGroupItem({ value }: { value: string }) {
 }
 
 export function Label({ children }: { children: ReactNode }) {
-  return <span className="no-drag inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-zinc-200">{children}</span>;
+  return (
+    <span className="no-drag inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-zinc-200">
+      {children}
+    </span>
+  );
 }
 
 export function ErrorBoundaryView() {

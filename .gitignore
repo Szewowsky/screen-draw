@@ -6,6 +6,9 @@ build/
 dist/
 out/
 
+# Installers
+*.dmg
+
 # OS files
 .DS_Store
 Thumbs.db

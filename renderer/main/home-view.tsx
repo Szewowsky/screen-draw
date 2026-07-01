@@ -145,7 +145,9 @@ export function HomeView() {
 
   // Track overlay active state broadcast from the backend.
   useEffect(() => {
-    void window.screenDraw.ipc.invoke<{ active: boolean }>("overlay:getState").then((s) => setActive(s.active));
+    void window.screenDraw.ipc
+      .invoke<{ active: boolean }>("overlay:getState")
+      .then((s) => setActive(s.active));
     const unsub = window.screenDraw.ipc.on("overlay:active-changed", (params) => {
       setActive(Boolean((params as { active?: boolean })?.active));
     });
@@ -192,7 +194,8 @@ export function HomeView() {
       <div className="flex flex-col gap-8 px-7 pb-8">
         <div className="flex flex-col gap-4">
           <Text color="secondary">
-            Draw, highlight, and point anywhere on your screen — ideal for tutorials and screen recordings.
+            Draw, highlight, and point anywhere on your screen — ideal for tutorials and screen
+            recordings.
           </Text>
           <Button variant="accent" size="large" className="w-full" onClick={toggleDrawing}>
             {active ? "Stop drawing" : "Start drawing"}
@@ -219,7 +222,12 @@ export function HomeView() {
             ) : (
               <div className="flex items-center gap-4">
                 <ShortcutKeys accelerator={shortcut} />
-                <Button variant="transparent" size="small" className="text-lg font-bold" onClick={() => setCapturing(true)}>
+                <Button
+                  variant="transparent"
+                  size="small"
+                  className="text-lg font-bold"
+                  onClick={() => setCapturing(true)}
+                >
                   Change
                 </Button>
               </div>
@@ -227,7 +235,10 @@ export function HomeView() {
           </Field>
         </FieldSet>
 
-        <FieldSet title="Defaults" description="The pen color and size used when drawing mode starts.">
+        <FieldSet
+          title="Defaults"
+          description="The pen color and size used when drawing mode starts."
+        >
           <Field label="Color">
             <div className="flex items-center gap-2">
               <SegmentedControl
@@ -235,7 +246,8 @@ export function HomeView() {
                 size="small"
                 value={color}
                 onValueChange={(value) => {
-                  if (typeof value === "string" && value) defaultsMutation.mutate({ defaultColor: value });
+                  if (typeof value === "string" && value)
+                    defaultsMutation.mutate({ defaultColor: value });
                 }}
                 aria-label="Default color"
               >

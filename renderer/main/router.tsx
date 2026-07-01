@@ -53,6 +53,7 @@ declare module "@tanstack/react-router" {
   }
   interface StaticDataRouteOption {
     title?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- app-defined static route data; component type is intentionally open
     component?: any;
   }
 }

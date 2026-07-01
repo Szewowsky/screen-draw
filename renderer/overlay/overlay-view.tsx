@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import {
   Button,
   ColorWell,
@@ -84,9 +90,15 @@ function drawArrowHead(ctx: CanvasRenderingContext2D, from: Point, to: Point, si
   const angle = Math.atan2(to.y - from.y, to.x - from.x);
   ctx.beginPath();
   ctx.moveTo(to.x, to.y);
-  ctx.lineTo(to.x - headLen * Math.cos(angle - Math.PI / 6), to.y - headLen * Math.sin(angle - Math.PI / 6));
+  ctx.lineTo(
+    to.x - headLen * Math.cos(angle - Math.PI / 6),
+    to.y - headLen * Math.sin(angle - Math.PI / 6),
+  );
   ctx.moveTo(to.x, to.y);
-  ctx.lineTo(to.x - headLen * Math.cos(angle + Math.PI / 6), to.y - headLen * Math.sin(angle + Math.PI / 6));
+  ctx.lineTo(
+    to.x - headLen * Math.cos(angle + Math.PI / 6),
+    to.y - headLen * Math.sin(angle + Math.PI / 6),
+  );
   ctx.stroke();
 }
 
@@ -283,7 +295,9 @@ export function OverlayView() {
         // Fall back to this window's display id from the URL.
       }
       unsub = window.screenDraw.ipc.on("overlay:active-display-changed", (params) => {
-        const nextDisplayId = normalizeDisplayId((params as OverlayWindowState | undefined)?.activeDisplayId);
+        const nextDisplayId = normalizeDisplayId(
+          (params as OverlayWindowState | undefined)?.activeDisplayId,
+        );
         activeDisplayIdRef.current = nextDisplayId;
         setActiveDisplayId(nextDisplayId);
       });
@@ -414,7 +428,9 @@ export function OverlayView() {
   }, [setupCanvas, redraw, undo, redo, exit, clearAll, selectThisDisplay]);
 
   const showToolbar =
-    displayIdRef.current === null || activeDisplayId === null || displayIdRef.current === activeDisplayId;
+    displayIdRef.current === null ||
+    activeDisplayId === null ||
+    displayIdRef.current === activeDisplayId;
 
   return (
     <div className="fixed inset-0 h-full w-full">
@@ -528,7 +544,12 @@ function FloatingToolbar({
         {TOOLS.map(({ tool: t, label, key, Icon }) => (
           <Tooltip key={t}>
             <TooltipTrigger asChild>
-              <SegmentedControlItem value={t} iconOnly className="!size-6 !rounded-md" aria-label={label}>
+              <SegmentedControlItem
+                value={t}
+                iconOnly
+                className="!size-6 !rounded-md"
+                aria-label={label}
+              >
                 <Icon className="size-3.5" />
               </SegmentedControlItem>
             </TooltipTrigger>
@@ -552,7 +573,12 @@ function FloatingToolbar({
         {PALETTE.map((c, i) => (
           <Tooltip key={c.value}>
             <TooltipTrigger asChild>
-              <SegmentedControlItem value={c.value} iconOnly className="!size-6 !rounded-md" aria-label={c.name}>
+              <SegmentedControlItem
+                value={c.value}
+                iconOnly
+                className="!size-6 !rounded-md"
+                aria-label={c.name}
+              >
                 <span className="size-3.5 rounded-full" style={{ backgroundColor: c.value }} />
               </SegmentedControlItem>
             </TooltipTrigger>
@@ -649,7 +675,14 @@ function FloatingToolbar({
 
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="transparent" size="small" iconOnly className="!size-6" onClick={onExit} aria-label="Stop drawing">
+          <Button
+            variant="transparent"
+            size="small"
+            iconOnly
+            className="!size-6"
+            onClick={onExit}
+            aria-label="Stop drawing"
+          >
             <X className="size-3.5" />
           </Button>
         </TooltipTrigger>

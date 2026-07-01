@@ -1,12 +1,9 @@
 {
-  "id": "1uy3qywy",
   "name": "screen-draw",
   "version": "1.0.4",
-  "author": "Robert Szewczyk",
-  "productName": "Screen Draw",
-  "description": "Draw annotations on your screen",
-  "iconDescription": "A screen annotation tool for macOS that lets users activate drawing mode via keyboard shortcut or button hold to sketch, highlight, and annotate directly on the desktop. Perfect for tutorial recording and presentations where you need to draw attention to specific areas. Think of a cursor with a pencil, a desktop screen with drawn lines, or a pointer with a trail of marks.",
   "private": true,
+  "description": "Draw annotations on your screen",
+  "author": "Robert Szewczyk",
   "type": "module",
   "main": "build/main/index.js",
   "scripts": {
@@ -18,7 +15,7 @@
     "dev": "npm run build && electron .",
     "start": "electron .",
     "dist": "npm run build && electron-builder --mac dmg zip --publish never",
-    "lint": "npm run type-check",
+    "lint": "eslint .",
     "type-check": "tsc --noEmit && tsc -p main/tsconfig.json --noEmit",
     "format": "oxfmt --write ."
   },
@@ -89,5 +86,8 @@
     "dmg": {
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     }
-  }
+  },
+  "iconDescription": "A screen annotation tool for macOS that lets users activate drawing mode via keyboard shortcut or button hold to sketch, highlight, and annotate directly on the desktop. Perfect for tutorial recording and presentations where you need to draw attention to specific areas. Think of a cursor with a pencil, a desktop screen with drawn lines, or a pointer with a trail of marks.",
+  "id": "1uy3qywy",
+  "productName": "Screen Draw"
 }

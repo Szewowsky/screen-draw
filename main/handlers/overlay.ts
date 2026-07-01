@@ -8,7 +8,12 @@
 
 import { BrowserWindow, ipcMain } from "electron";
 
-import { getSettings, setDefaults, setShortcut, type ScreenDrawSettings } from "../services/settings-store.js";
+import {
+  getSettings,
+  setDefaults,
+  setShortcut,
+  type ScreenDrawSettings,
+} from "../services/settings-store.js";
 import { broadcast } from "../services/events.js";
 import { registerToggleShortcut } from "../services/shortcut.js";
 import {
@@ -43,23 +48,29 @@ export function registerOverlayHandlers(): void {
     return getSettings();
   });
 
-  ipcMain.handle("settings:setShortcut", async (_event, shortcut: unknown): Promise<ScreenDrawSettings> => {
-    if (typeof shortcut !== "string") {
-      throw new Error("settings:setShortcut expects a string accelerator");
-    }
-    const next = setShortcut(shortcut);
-    await registerToggleShortcut(next.shortcut);
-    broadcast("settings:changed", next);
-    return next;
-  });
+  ipcMain.handle(
+    "settings:setShortcut",
+    async (_event, shortcut: unknown): Promise<ScreenDrawSettings> => {
+      if (typeof shortcut !== "string") {
+        throw new Error("settings:setShortcut expects a string accelerator");
+      }
+      const next = setShortcut(shortcut);
+      await registerToggleShortcut(next.shortcut);
+      broadcast("settings:changed", next);
+      return next;
+    },
+  );
 
-  ipcMain.handle("settings:setDefaults", async (_event, partial: unknown): Promise<ScreenDrawSettings> => {
-    const input = (partial ?? {}) as { defaultColor?: unknown; defaultSize?: unknown };
-    const next = setDefaults({
-      defaultColor: typeof input.defaultColor === "string" ? input.defaultColor : undefined,
-      defaultSize: typeof input.defaultSize === "number" ? input.defaultSize : undefined,
-    });
-    broadcast("settings:changed", next);
-    return next;
-  });
+  ipcMain.handle(
+    "settings:setDefaults",
+    async (_event, partial: unknown): Promise<ScreenDrawSettings> => {
+      const input = (partial ?? {}) as { defaultColor?: unknown; defaultSize?: unknown };
+      const next = setDefaults({
+        defaultColor: typeof input.defaultColor === "string" ? input.defaultColor : undefined,
+        defaultSize: typeof input.defaultSize === "number" ? input.defaultSize : undefined,
+      });
+      broadcast("settings:changed", next);
+      return next;
+    },
+  );
 }

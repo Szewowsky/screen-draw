@@ -18,7 +18,10 @@ function write(level: LogLevel, scope: string, message: string, ...rest: unknown
 }
 
 export const logger = {
-  debug: (scope: string, message: string, ...rest: unknown[]) => write("debug", scope, message, ...rest),
-  info: (scope: string, message: string, ...rest: unknown[]) => write("info", scope, message, ...rest),
-  error: (scope: string, message: string, ...rest: unknown[]) => write("error", scope, message, ...rest),
+  debug: (scope: string, message: string, ...rest: unknown[]) =>
+    write("debug", scope, message, ...rest),
+  info: (scope: string, message: string, ...rest: unknown[]) =>
+    write("info", scope, message, ...rest),
+  error: (scope: string, message: string, ...rest: unknown[]) =>
+    write("error", scope, message, ...rest),
 };

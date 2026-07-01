@@ -139,7 +139,9 @@ async function syncOverlayWindows(): Promise<BrowserWindow[]> {
     }
   }
 
-  const windows = await Promise.all(displays.map((display) => createOverlayWindowForDisplay(display)));
+  const windows = await Promise.all(
+    displays.map((display) => createOverlayWindowForDisplay(display)),
+  );
 
   if (activeDisplayId !== null && !displayIds.has(activeDisplayId)) {
     activeDisplayId = getDisplayIdForActivation();
@@ -217,7 +219,10 @@ export async function setOverlayActiveDisplay(displayId: number): Promise<void> 
   logger.info("overlay", `Active drawing display changed to ${displayId}`);
 }
 
-export async function setOverlayActive(next: boolean, options: OverlayActivationOptions = {}): Promise<void> {
+export async function setOverlayActive(
+  next: boolean,
+  options: OverlayActivationOptions = {},
+): Promise<void> {
   await syncOverlayWindows();
 
   active = next;

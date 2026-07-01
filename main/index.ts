@@ -169,13 +169,17 @@ function setupTray() {
     {
       label: "Show Control Panel",
       click: () => {
-        showMainWindow().catch((error) => logger.error("main", "Failed to show main window from tray", error));
+        showMainWindow().catch((error) =>
+          logger.error("main", "Failed to show main window from tray", error),
+        );
       },
     },
     {
       label: "Toggle Drawing",
       click: () => {
-        toggleOverlay().catch((error) => logger.error("main", "Failed to toggle overlay from tray", error));
+        toggleOverlay().catch((error) =>
+          logger.error("main", "Failed to toggle overlay from tray", error),
+        );
       },
     },
     { type: "separator" },
@@ -187,7 +191,9 @@ function setupTray() {
   tray.setContextMenu(trayMenu);
 
   tray.on("click", () => {
-    showMainWindow().catch((error) => logger.error("main", "Failed to show main window from tray", error));
+    showMainWindow().catch((error) =>
+      logger.error("main", "Failed to show main window from tray", error),
+    );
   });
 
   logger.info("main", "Menu bar tray configured");
