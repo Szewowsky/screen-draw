@@ -194,7 +194,7 @@ export function HomeView() {
           <Text color="secondary">
             Draw, highlight, and point anywhere on your screen — ideal for tutorials and screen recordings.
           </Text>
-          <Button variant="accent" size="large" onClick={toggleDrawing}>
+          <Button variant="accent" size="large" className="w-full" onClick={toggleDrawing}>
             {active ? "Stop drawing" : "Start drawing"}
           </Button>
           <div className="flex items-center justify-center gap-2">

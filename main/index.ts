@@ -95,6 +95,8 @@ async function createMainWindow() {
     });
 
     mainWindow?.show();
+    app.focus({ steal: true });
+    mainWindow?.focus();
 
     const showEndTime = Date.now();
     logger.info("main", "⏱️ [COLD_START] Window shown", {
@@ -157,8 +159,16 @@ async function setupApplicationMenu() {
 
 // ── Menu bar tray ─────────────────────────────────────────────────────
 function setupTray() {
-  const iconPath = path.join(__dirname, "..", "..", "app-icon.png");
-  const icon = nativeImage.createFromPath(iconPath).resize({ width: 18, height: 18 });
+  const trayIconSvg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+      <path d="M2.7 12.3c1.8-2.8 5.3-1.1 6.6-3.6.7-1.4-.8-2.7-2.2-1.7-2.3 1.7-1 6.1 2.4 6.1 2 0 3.4-1.1 4.6-2.8" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M11 6.7 14.8 2.9l1.3 1.3-3.8 3.8-2 .7.7-2Z" fill="black"/>
+    </svg>
+  `;
+  const icon = nativeImage.createFromDataURL(
+    `data:image/svg+xml;base64,${Buffer.from(trayIconSvg).toString("base64")}`,
+  );
+  icon.setTemplateImage(true);
   tray = new Tray(icon);
   tray.setToolTip("Screen Draw");
 
