@@ -53,7 +53,7 @@ export function Button({
         variant === "transparent" && "bg-transparent text-zinc-100 hover:bg-white/8 active:bg-white/12",
         size === "small" && (iconOnly ? "size-8" : "h-8 px-3 text-sm"),
         size === "medium" && (iconOnly ? "size-9" : "h-9 px-4 text-sm"),
-        size === "large" && (iconOnly ? "size-11" : "h-11 px-5 text-base"),
+        size === "large" && (iconOnly ? "size-11" : "h-14 px-6 text-lg"),
         className,
       )}
     />
@@ -101,7 +101,7 @@ export function ScrollArea({ toolbar, children }: { toolbar?: ReactNode; childre
 
 export function Toolbar({ children }: { children: ReactNode }) {
   return (
-    <div className="drag-region sticky top-0 z-20 flex h-[72px] items-center bg-app/95 px-5 pl-24 backdrop-blur-xl">
+    <div className="drag-region sticky top-0 z-20 flex h-20 items-center bg-app/95 px-8 pl-24 backdrop-blur-xl">
       {children}
     </div>
   );
@@ -112,7 +112,7 @@ export function ToolbarContent({ children }: { children: ReactNode }) {
 }
 
 export function ToolbarTitle({ children }: { children: ReactNode }) {
-  return <h1 className="truncate text-lg font-bold text-zinc-50">{children}</h1>;
+  return <h1 className="truncate text-[22px] font-bold leading-none text-zinc-50">{children}</h1>;
 }
 
 export function Text({
@@ -130,7 +130,7 @@ export function Text({
     <span
       className={clsx(
         "leading-relaxed",
-        variant === "small" ? "text-sm" : "text-base",
+        variant === "small" ? "text-sm font-semibold" : "text-[17px] font-semibold",
         color === "secondary" && "text-secondary",
         color === "tertiary" && "text-tertiary",
         !color && "text-primary",
@@ -160,14 +160,16 @@ export function FieldSet({
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-5">
       {title || description ? (
         <div className="flex flex-col gap-1">
-          {title ? <h2 className="text-base font-bold text-zinc-50">{title}</h2> : null}
-          {description ? <p className="text-sm font-medium leading-snug text-zinc-400">{description}</p> : null}
+          {title ? <h2 className="text-xl font-bold leading-tight text-zinc-50">{title}</h2> : null}
+          {description ? <p className="text-base font-semibold leading-snug text-zinc-400">{description}</p> : null}
         </div>
       ) : null}
-      <div className="overflow-hidden rounded-lg bg-zinc-900/70">{children}</div>
+      <div className="overflow-hidden rounded-[20px] bg-[#181818] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+        {children}
+      </div>
     </section>
   );
 }
@@ -184,7 +186,7 @@ export function Field({
   return (
     <div
       className={clsx(
-        "flex gap-4 px-4 py-4",
+        "flex gap-4 px-8 py-6",
         orientation === "horizontal" ? "items-center justify-between" : "flex-col",
       )}
     >
@@ -204,7 +206,7 @@ export function FieldContent({ children }: { children: ReactNode }) {
 
 export function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: ReactNode }) {
   return (
-    <label htmlFor={htmlFor} className="text-sm font-bold text-zinc-50">
+    <label htmlFor={htmlFor} className="text-[18px] font-bold leading-none text-zinc-50">
       {children}
     </label>
   );
@@ -231,7 +233,9 @@ export function SegmentedControl({
 }) {
   return (
     <SegmentedContext.Provider value={{ value, onValueChange }}>
-      <div className={clsx("no-drag inline-flex items-center rounded-lg bg-zinc-800/90 p-1", className)}>{children}</div>
+      <div className={clsx("no-drag inline-flex items-center rounded-[14px] bg-[#242424] p-1.5", className)}>
+        {children}
+      </div>
     </SegmentedContext.Provider>
   );
 }
@@ -293,10 +297,12 @@ export function Slider({
   "aria-label"?: string;
 }) {
   const current = value[0] ?? min;
+  const fill = Math.min(100, Math.max(0, ((current - min) / (max - min)) * 100));
 
   return (
-    <div className={clsx("no-drag flex h-8 items-center gap-2 rounded-lg bg-zinc-800 px-3 text-zinc-50", className)}>
-      {startContent ? <span className="text-zinc-100">{startContent}</span> : null}
+    <div className={clsx("no-drag relative flex h-11 items-center overflow-hidden rounded-xl bg-[#242424] text-zinc-50", className)}>
+      <span className="pointer-events-none absolute inset-y-0 left-0 bg-[#74492d]" style={{ width: `${Math.max(34, fill)}%` }} />
+      {startContent ? <span className="pointer-events-none relative z-10 flex h-full w-12 items-center justify-center text-zinc-100">{startContent}</span> : null}
       <input
         type="range"
         min={min}
@@ -304,16 +310,16 @@ export function Slider({
         step={step}
         value={current}
         onChange={(event) => onValueChange([Number(event.currentTarget.value)])}
-        className="slider-input min-w-0 flex-1"
+        className="absolute inset-0 z-20 cursor-pointer opacity-0"
       />
-      {endContent ? <span className="min-w-5 text-right text-sm font-bold">{endContent(current)}</span> : null}
+      {endContent ? <span className="pointer-events-none relative z-10 ml-auto min-w-9 pr-4 text-right text-base font-bold">{endContent(current)}</span> : null}
     </div>
   );
 }
 
 export function Key({ children }: { children: ReactNode }) {
   return (
-    <kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-white/10 bg-zinc-950/50 px-1.5 text-xs font-bold text-zinc-400">
+    <kbd className="inline-flex h-7 min-w-7 items-center justify-center rounded-lg border border-white/10 bg-[#1d1d1d] px-1.5 text-[13px] font-bold leading-none text-zinc-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       {children}
     </kbd>
   );

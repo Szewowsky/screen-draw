@@ -26,8 +26,8 @@ npm run dist
 
 The generated installer is written to `dist/`:
 
-- `Screen Draw-1.0.0-arm64.dmg`
-- `Screen Draw-1.0.0-arm64.zip`
+- `Screen Draw-1.0.1-arm64.dmg`
+- `Screen Draw-1.0.1-arm64.zip`
 
 ## Checks
 
