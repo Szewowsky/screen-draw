@@ -159,15 +159,8 @@ async function setupApplicationMenu() {
 
 // ── Menu bar tray ─────────────────────────────────────────────────────
 function setupTray() {
-  const trayIconSvg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
-      <path d="M3.2 14.2c2.4-3.5 6.9-1.4 8.5-4.8.9-1.9-1.2-3.4-3-2-3.1 2.4-1.2 7.7 3.2 7.7 2.7 0 4.5-1.5 6.1-3.9" fill="none" stroke="black" stroke-width="2.45" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M13.3 7.5 18.1 2.7l1.8 1.8-4.8 4.8-2.8.9 1-2.7Z" fill="black"/>
-    </svg>
-  `;
-  const icon = nativeImage.createFromDataURL(
-    `data:image/svg+xml;base64,${Buffer.from(trayIconSvg).toString("base64")}`,
-  ).resize({ width: 22, height: 22 });
+  const iconPath = path.join(__dirname, "..", "..", "assets", "tray-iconTemplate.png");
+  const icon = nativeImage.createFromPath(iconPath);
   icon.setTemplateImage(true);
   tray = new Tray(icon);
   tray.setToolTip("Screen Draw");

@@ -144,7 +144,7 @@ export function Text({
 
 export function Separator({ orientation = "horizontal" }: { orientation?: "horizontal" | "vertical" }) {
   return orientation === "vertical" ? (
-    <div className="mx-1 h-6 w-px bg-white/10" />
+    <div className="mx-0.5 h-5 w-px bg-white/10" />
   ) : (
     <div className="h-px w-full bg-white/10" />
   );
@@ -301,7 +301,10 @@ export function Slider({
 
   return (
     <div className={clsx("no-drag relative flex h-11 items-center overflow-hidden rounded-xl bg-[#242424] text-zinc-50", className)}>
-      <span className="pointer-events-none absolute inset-y-0 left-0 bg-[#74492d]" style={{ width: `${Math.max(28, fill)}%` }} />
+      <span
+        className="pointer-events-none absolute inset-y-0 left-0 bg-[#5d3924]/55"
+        style={{ width: `${Math.max(18, fill)}%` }}
+      />
       {startContent ? <span className="pointer-events-none relative z-10 flex h-full w-12 items-center justify-center text-zinc-100">{startContent}</span> : null}
       <input
         type="range"
