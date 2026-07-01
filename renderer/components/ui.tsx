@@ -301,7 +301,7 @@ export function Slider({
 
   return (
     <div className={clsx("no-drag relative flex h-11 items-center overflow-hidden rounded-xl bg-[#242424] text-zinc-50", className)}>
-      <span className="pointer-events-none absolute inset-y-0 left-0 bg-[#74492d]" style={{ width: `${Math.max(34, fill)}%` }} />
+      <span className="pointer-events-none absolute inset-y-0 left-0 bg-[#74492d]" style={{ width: `${Math.max(28, fill)}%` }} />
       {startContent ? <span className="pointer-events-none relative z-10 flex h-full w-12 items-center justify-center text-zinc-100">{startContent}</span> : null}
       <input
         type="range"
