@@ -6,24 +6,37 @@
  * broadcast a change event so the control window stays in sync.
  */
 
-import { ipcMain } from "electron";
+import { BrowserWindow, ipcMain } from "electron";
 
 import { getSettings, setDefaults, setShortcut, type ScreenDrawSettings } from "../services/settings-store.js";
 import { broadcast } from "../services/events.js";
 import { registerToggleShortcut } from "../services/shortcut.js";
-import { isOverlayActive, setOverlayActive } from "../windows/overlay-window.js";
+import {
+  getActiveDisplayId,
+  isOverlayActive,
+  setOverlayActive,
+  setOverlayActiveDisplay,
+} from "../windows/overlay-window.js";
 
 export function registerOverlayHandlers(): void {
-  ipcMain.handle("overlay:setActive", async (_event, active: unknown) => {
+  ipcMain.handle("overlay:setActive", async (event, active: unknown) => {
     if (typeof active !== "boolean") {
       throw new Error("overlay:setActive expects a boolean");
     }
-    await setOverlayActive(active);
-    return { active: isOverlayActive() };
+    await setOverlayActive(active, { sourceWindow: BrowserWindow.fromWebContents(event.sender) });
+    return { active: isOverlayActive(), activeDisplayId: getActiveDisplayId() };
   });
 
   ipcMain.handle("overlay:getState", async () => {
-    return { active: isOverlayActive() };
+    return { active: isOverlayActive(), activeDisplayId: getActiveDisplayId() };
+  });
+
+  ipcMain.handle("overlay:setActiveDisplay", async (_event, displayId: unknown) => {
+    if (typeof displayId !== "number") {
+      throw new Error("overlay:setActiveDisplay expects a display id");
+    }
+    await setOverlayActiveDisplay(displayId);
+    return { active: isOverlayActive(), activeDisplayId: getActiveDisplayId() };
   });
 
   ipcMain.handle("settings:get", async (): Promise<ScreenDrawSettings> => {

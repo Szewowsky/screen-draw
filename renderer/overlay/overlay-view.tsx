@@ -37,6 +37,10 @@ interface Shape {
   points: Point[];
 }
 
+interface OverlayWindowState {
+  activeDisplayId?: number | null;
+}
+
 const TOOLS: { tool: DrawTool; label: string; key: string; Icon: typeof Pencil }[] = [
   { tool: "pen", label: "Pen", key: "P", Icon: Pencil },
   { tool: "highlighter", label: "Highlighter", key: "H", Icon: Highlighter },
@@ -45,6 +49,17 @@ const TOOLS: { tool: DrawTool; label: string; key: string; Icon: typeof Pencil }
   { tool: "rectangle", label: "Rectangle", key: "R", Icon: Square },
   { tool: "ellipse", label: "Ellipse", key: "O", Icon: Circle },
 ];
+
+function getOverlayDisplayId(): number | null {
+  const value = new URLSearchParams(window.location.search).get("displayId");
+  if (value === null) return null;
+  const displayId = Number(value);
+  return Number.isFinite(displayId) ? displayId : null;
+}
+
+function normalizeDisplayId(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
 
 /** Apply the Shift-key constraint to a shape's end point (45° snap for lines, square/circle for boxes). */
 function constrainPoint(tool: DrawTool, start: Point, end: Point, shift: boolean): Point {
@@ -139,12 +154,16 @@ export function OverlayView() {
   const redoRef = useRef<Shape[]>([]);
   const currentRef = useRef<Shape | null>(null);
   const drawingRef = useRef(false);
+  const displayIdRef = useRef(getOverlayDisplayId());
 
   const [tool, setTool] = useState<DrawTool>("pen");
   const [color, setColor] = useState(PALETTE[0].value);
   const [size, setSize] = useState(4);
   const [shapeCount, setShapeCount] = useState(0);
   const [redoCount, setRedoCount] = useState(0);
+  const [activeDisplayId, setActiveDisplayId] = useState<number | null>(displayIdRef.current);
+  const activeDisplayIdRef = useRef<number | null>(activeDisplayId);
+  activeDisplayIdRef.current = activeDisplayId;
 
   // Keep the latest tool settings available to the (stable) pointer handlers.
   const toolRef = useRef(tool);
@@ -217,6 +236,20 @@ export function OverlayView() {
     void window.screenDraw.ipc.invoke("overlay:setActive", false);
   }, []);
 
+  const isThisActiveDisplay = useCallback(() => {
+    const displayId = displayIdRef.current;
+    const activeId = activeDisplayIdRef.current;
+    return displayId === null || activeId === null || displayId === activeId;
+  }, []);
+
+  const selectThisDisplay = useCallback(() => {
+    const displayId = displayIdRef.current;
+    if (displayId === null || activeDisplayIdRef.current === displayId) return;
+    activeDisplayIdRef.current = displayId;
+    setActiveDisplayId(displayId);
+    void window.screenDraw.ipc.invoke("overlay:setActiveDisplay", displayId);
+  }, []);
+
   // Load defaults and stay in sync with the control window.
   useEffect(() => {
     let unsub: (() => void) | undefined;
@@ -237,16 +270,41 @@ export function OverlayView() {
     return () => unsub?.();
   }, []);
 
+  // Keep the toolbar and scoped shortcuts on whichever display was last clicked.
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    void (async () => {
+      try {
+        const state = await window.screenDraw.ipc.invoke<OverlayWindowState>("overlay:getState");
+        const nextDisplayId = normalizeDisplayId(state.activeDisplayId);
+        activeDisplayIdRef.current = nextDisplayId;
+        setActiveDisplayId(nextDisplayId);
+      } catch {
+        // Fall back to this window's display id from the URL.
+      }
+      unsub = window.screenDraw.ipc.on("overlay:active-display-changed", (params) => {
+        const nextDisplayId = normalizeDisplayId((params as OverlayWindowState | undefined)?.activeDisplayId);
+        activeDisplayIdRef.current = nextDisplayId;
+        setActiveDisplayId(nextDisplayId);
+      });
+    })();
+    return () => unsub?.();
+  }, []);
+
   // Undo/redo arrive as backend broadcasts because ⌘Z / ⌘⇧Z are registered as
   // global shortcuts while drawing (the Edit menu would otherwise swallow them).
   useEffect(() => {
-    const offUndo = window.screenDraw.ipc.on("overlay:undo", () => undo());
-    const offRedo = window.screenDraw.ipc.on("overlay:redo", () => redo());
+    const offUndo = window.screenDraw.ipc.on("overlay:undo", () => {
+      if (isThisActiveDisplay()) undo();
+    });
+    const offRedo = window.screenDraw.ipc.on("overlay:redo", () => {
+      if (isThisActiveDisplay()) redo();
+    });
     return () => {
       offUndo?.();
       offRedo?.();
     };
-  }, [undo, redo]);
+  }, [undo, redo, isThisActiveDisplay]);
 
   // Canvas setup + pointer + keyboard handlers.
   useEffect(() => {
@@ -261,6 +319,7 @@ export function OverlayView() {
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
+      selectThisDisplay();
       canvas.setPointerCapture(e.pointerId);
       currentRef.current = {
         tool: toolRef.current,
@@ -352,25 +411,30 @@ export function OverlayView() {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("resize", setupCanvas);
     };
-  }, [setupCanvas, redraw, undo, redo, exit, clearAll]);
+  }, [setupCanvas, redraw, undo, redo, exit, clearAll, selectThisDisplay]);
+
+  const showToolbar =
+    displayIdRef.current === null || activeDisplayId === null || displayIdRef.current === activeDisplayId;
 
   return (
     <div className="fixed inset-0 h-full w-full">
       <canvas ref={canvasRef} className="absolute inset-0 cursor-crosshair" />
-      <FloatingToolbar
-        tool={tool}
-        onToolChange={setTool}
-        color={color}
-        onColorChange={setColor}
-        size={size}
-        onSizeChange={setSize}
-        canUndo={shapeCount > 0}
-        onUndo={undo}
-        canRedo={redoCount > 0}
-        onRedo={redo}
-        onClear={clearAll}
-        onExit={exit}
-      />
+      {showToolbar ? (
+        <FloatingToolbar
+          tool={tool}
+          onToolChange={setTool}
+          color={color}
+          onColorChange={setColor}
+          size={size}
+          onSizeChange={setSize}
+          canUndo={shapeCount > 0}
+          onUndo={undo}
+          canRedo={redoCount > 0}
+          onRedo={redo}
+          onClear={clearAll}
+          onExit={exit}
+        />
+      ) : null}
     </div>
   );
 }
