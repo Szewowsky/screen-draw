@@ -184,6 +184,15 @@ function setupTray() {
     },
     { type: "separator" },
     {
+      label: "Settings…",
+      click: () => {
+        openSettingsWindow().catch((error) =>
+          logger.error("main", "Failed to open settings from tray", error),
+        );
+      },
+    },
+    { type: "separator" },
+    {
       label: "Quit",
       click: () => app.quit(),
     },
