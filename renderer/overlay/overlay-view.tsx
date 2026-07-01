@@ -29,7 +29,16 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { MAX_SIZE, MIN_SIZE, PALETTE, type DrawTool, type ScreenDrawSettings } from "./constants";
+import {
+  MAX_SIZE,
+  MIN_SIZE,
+  PALETTE,
+  isPaletteColor,
+  type DrawTool,
+  type ScreenDrawSettings,
+  type ToolbarPosition,
+} from "./constants";
+import { clampToolbarPosition, sanitizeToolbarPosition } from "./toolbar-prefs";
 import {
   arrowHeadPoints,
   canRedo as modelCanRedo,
@@ -147,6 +156,8 @@ export function OverlayView() {
   const [tool, setTool] = useState<DrawTool>("pen");
   const [color, setColor] = useState(PALETTE[0].value);
   const [size, setSize] = useState(4);
+  const [recentColors, setRecentColors] = useState<string[]>([]);
+  const [toolbarPos, setToolbarPos] = useState<ToolbarPosition | null>(null);
   const [historyState, setHistoryState] = useState({
     canUndo: false,
     canRedo: false,
@@ -247,22 +258,60 @@ export function OverlayView() {
 
   // Load defaults and stay in sync with the control window.
   useEffect(() => {
+    // Only follow default color/size when they actually change, so unrelated
+    // settings updates (toolbar position, recent colors) don't reset the
+    // locally picked tool options.
+    let prev: ScreenDrawSettings | null = null;
+    const applySettings = (next: ScreenDrawSettings) => {
+      if (next?.defaultColor && next.defaultColor !== prev?.defaultColor) {
+        setColor(next.defaultColor);
+      }
+      if (typeof next?.defaultSize === "number" && next.defaultSize !== prev?.defaultSize) {
+        setSize(next.defaultSize);
+      }
+      setRecentColors(Array.isArray(next?.recentColors) ? next.recentColors : []);
+      setToolbarPos(
+        sanitizeToolbarPosition(next?.toolbarPosition, {
+          width: window.innerWidth,
+          height: window.innerHeight,
+        }),
+      );
+      prev = next;
+    };
+
     let unsub: (() => void) | undefined;
     void (async () => {
       try {
         const settings = await window.screenDraw.ipc.invoke<ScreenDrawSettings>("settings:get");
-        setColor(settings.defaultColor);
-        setSize(settings.defaultSize);
+        applySettings(settings);
       } catch {
         // Fall back to component defaults.
       }
       unsub = window.screenDraw.ipc.on("settings:changed", (params) => {
-        const next = params as ScreenDrawSettings;
-        if (next?.defaultColor) setColor(next.defaultColor);
-        if (typeof next?.defaultSize === "number") setSize(next.defaultSize);
+        applySettings(params as ScreenDrawSettings);
       });
     })();
     return () => unsub?.();
+  }, []);
+
+  const moveToolbar = useCallback((pos: ToolbarPosition) => {
+    setToolbarPos(
+      clampToolbarPosition(pos, { width: window.innerWidth, height: window.innerHeight }),
+    );
+  }, []);
+
+  const commitToolbarPos = useCallback((pos: ToolbarPosition) => {
+    const clamped = clampToolbarPosition(pos, {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    });
+    setToolbarPos(clamped);
+    void window.screenDraw.ipc.invoke("settings:setDefaults", { toolbarPosition: clamped });
+  }, []);
+
+  const recordRecentColor = useCallback((value: string) => {
+    if (isPaletteColor(value)) return;
+    void window.screenDraw.ipc.invoke("settings:setDefaults", { recentColor: value });
   }, []);
 
   // Keep the toolbar and scoped shortcuts on whichever display was last clicked.
@@ -402,8 +451,13 @@ export function OverlayView() {
           onToolChange={setTool}
           color={color}
           onColorChange={setColor}
+          onColorCommit={recordRecentColor}
+          recentColors={recentColors}
           size={size}
           onSizeChange={setSize}
+          pos={toolbarPos}
+          onPosChange={moveToolbar}
+          onPosCommit={commitToolbarPos}
           canUndo={historyState.canUndo}
           onUndo={undo}
           canRedo={historyState.canRedo}
@@ -422,8 +476,13 @@ interface FloatingToolbarProps {
   onToolChange: (tool: DrawTool) => void;
   color: string;
   onColorChange: (color: string) => void;
+  onColorCommit: (color: string) => void;
+  recentColors: string[];
   size: number;
   onSizeChange: (size: number) => void;
+  pos: ToolbarPosition | null;
+  onPosChange: (pos: ToolbarPosition) => void;
+  onPosCommit: (pos: ToolbarPosition) => void;
   canUndo: boolean;
   onUndo: () => void;
   canRedo: boolean;
@@ -438,8 +497,13 @@ function FloatingToolbar({
   onToolChange,
   color,
   onColorChange,
+  onColorCommit,
+  recentColors,
   size,
   onSizeChange,
+  pos,
+  onPosChange,
+  onPosCommit,
   canUndo,
   onUndo,
   canRedo,
@@ -450,7 +514,7 @@ function FloatingToolbar({
 }: FloatingToolbarProps) {
   const barRef = useRef<HTMLDivElement>(null);
   const dragOffset = useRef<{ x: number; y: number } | null>(null);
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const lastDragPos = useRef<ToolbarPosition | null>(null);
 
   const onGripDown = (e: ReactPointerEvent) => {
     const rect = barRef.current?.getBoundingClientRect();
@@ -459,16 +523,24 @@ function FloatingToolbar({
 
     const onMove = (ev: PointerEvent) => {
       if (!dragOffset.current) return;
-      setPos({ x: ev.clientX - dragOffset.current.x, y: ev.clientY - dragOffset.current.y });
+      const next = { x: ev.clientX - dragOffset.current.x, y: ev.clientY - dragOffset.current.y };
+      lastDragPos.current = next;
+      onPosChange(next);
     };
     const onUp = () => {
       dragOffset.current = null;
+      if (lastDragPos.current) {
+        onPosCommit(lastDragPos.current);
+        lastDragPos.current = null;
+      }
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   };
+
+  const customColors = recentColors.filter((c) => !isPaletteColor(c));
 
   return (
     <div
@@ -549,11 +621,27 @@ function FloatingToolbar({
             <TooltipContent shortcut={[String(i + 1)]}>{c.name}</TooltipContent>
           </Tooltip>
         ))}
+        {customColors.map((c) => (
+          <Tooltip key={c}>
+            <TooltipTrigger asChild>
+              <SegmentedControlItem
+                value={c}
+                iconOnly
+                className="!size-6 !rounded-md"
+                aria-label={`Recent color ${c}`}
+              >
+                <span className="size-3.5 rounded-full" style={{ backgroundColor: c }} />
+              </SegmentedControlItem>
+            </TooltipTrigger>
+            <TooltipContent>Recent color</TooltipContent>
+          </Tooltip>
+        ))}
       </SegmentedControl>
 
       <ColorWell
         value={color}
         onChange={onColorChange}
+        onCommit={onColorCommit}
         size="small"
         className="!size-7 !rounded-md"
         aria-label="Custom color"

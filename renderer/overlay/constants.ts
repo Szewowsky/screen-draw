@@ -19,8 +19,22 @@ export const MAX_SIZE = 24;
 
 export type DrawTool = "pen" | "highlighter" | "line" | "arrow" | "rectangle" | "ellipse";
 
+export interface ToolbarPosition {
+  x: number;
+  y: number;
+}
+
 export interface ScreenDrawSettings {
   shortcut: string;
   defaultColor: string;
   defaultSize: number;
+  /** Last dragged position of the floating toolbar; null = default placement. */
+  toolbarPosition: ToolbarPosition | null;
+  /** Recently picked custom colors, most recent first. */
+  recentColors: string[];
+}
+
+/** True when `color` is one of the built-in palette swatches. */
+export function isPaletteColor(color: string): boolean {
+  return PALETTE.some((c) => c.value.toLowerCase() === color.toLowerCase());
 }

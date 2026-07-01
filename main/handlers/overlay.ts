@@ -64,10 +64,23 @@ export function registerOverlayHandlers(): void {
   ipcMain.handle(
     "settings:setDefaults",
     async (_event, partial: unknown): Promise<ScreenDrawSettings> => {
-      const input = (partial ?? {}) as { defaultColor?: unknown; defaultSize?: unknown };
+      const input = (partial ?? {}) as {
+        defaultColor?: unknown;
+        defaultSize?: unknown;
+        toolbarPosition?: unknown;
+        recentColor?: unknown;
+      };
+      const position = input.toolbarPosition as { x?: unknown; y?: unknown } | null | undefined;
       const next = setDefaults({
         defaultColor: typeof input.defaultColor === "string" ? input.defaultColor : undefined,
         defaultSize: typeof input.defaultSize === "number" ? input.defaultSize : undefined,
+        toolbarPosition:
+          position === null
+            ? null
+            : typeof position?.x === "number" && typeof position?.y === "number"
+              ? { x: position.x, y: position.y }
+              : undefined,
+        recentColor: typeof input.recentColor === "string" ? input.recentColor : undefined,
       });
       broadcast("settings:changed", next);
       return next;

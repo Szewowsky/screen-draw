@@ -19,7 +19,13 @@ import {
   toast,
 } from "../components/ui";
 import { Pencil } from "lucide-react";
-import { MAX_SIZE, MIN_SIZE, PALETTE, type ScreenDrawSettings } from "../overlay/constants";
+import {
+  MAX_SIZE,
+  MIN_SIZE,
+  PALETTE,
+  isPaletteColor,
+  type ScreenDrawSettings,
+} from "../overlay/constants";
 
 const SHORTCUT_ROWS: { label: string; keys: ReactNode }[] = [
   { label: "Pen", keys: <Key>P</Key> },
@@ -138,10 +144,18 @@ export function HomeView() {
   });
 
   const defaultsMutation = useMutation({
-    mutationFn: (partial: { defaultColor?: string; defaultSize?: number }) =>
+    mutationFn: (partial: { defaultColor?: string; defaultSize?: number; recentColor?: string }) =>
       window.screenDraw.ipc.invoke<ScreenDrawSettings>("settings:setDefaults", partial),
     onSuccess: (next) => queryClient.setQueryData(["settings"], next),
   });
+
+  // Follow settings changes made elsewhere (e.g. colors picked in the overlay toolbar).
+  useEffect(() => {
+    const unsub = window.screenDraw.ipc.on("settings:changed", (params) => {
+      queryClient.setQueryData(["settings"], params as ScreenDrawSettings);
+    });
+    return () => unsub();
+  }, [queryClient]);
 
   // Track overlay active state broadcast from the backend.
   useEffect(() => {
@@ -180,6 +194,7 @@ export function HomeView() {
   const shortcut = settings?.shortcut ?? "Command+Shift+D";
   const color = settings?.defaultColor ?? PALETTE[0].value;
   const brushSize = settings?.defaultSize ?? 4;
+  const recentColors = (settings?.recentColors ?? []).filter((c) => !isPaletteColor(c));
 
   return (
     <ScrollArea
@@ -256,10 +271,18 @@ export function HomeView() {
                     <span className="size-5 rounded-full" style={{ backgroundColor: c.value }} />
                   </SegmentedControlItem>
                 ))}
+                {recentColors.map((c) => (
+                  <SegmentedControlItem key={c} value={c} iconOnly aria-label={`Recent color ${c}`}>
+                    <span className="size-5 rounded-full" style={{ backgroundColor: c }} />
+                  </SegmentedControlItem>
+                ))}
               </SegmentedControl>
               <ColorWell
                 value={color}
                 onChange={(value) => defaultsMutation.mutate({ defaultColor: value })}
+                onCommit={(value) => {
+                  if (!isPaletteColor(value)) defaultsMutation.mutate({ recentColor: value });
+                }}
                 size="small"
                 aria-label="Custom default color"
               />

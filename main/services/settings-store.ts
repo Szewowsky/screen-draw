@@ -11,47 +11,21 @@ import * as path from "path";
 
 import { app } from "electron";
 import { logger } from "../logger.js";
+import {
+  DEFAULT_SETTINGS,
+  addRecentColor,
+  coerceSettings,
+  type ScreenDrawSettings,
+  type ToolbarPosition,
+} from "./settings-schema.js";
 
-export interface ScreenDrawSettings {
-  /** Global accelerator that toggles drawing mode, e.g. "Command+Shift+D". */
-  shortcut: string;
-  /** Default stroke color as a hex string. */
-  defaultColor: string;
-  /** Default stroke size in pixels. */
-  defaultSize: number;
-}
-
-const DEFAULT_SETTINGS: ScreenDrawSettings = {
-  shortcut: "Command+Shift+D",
-  defaultColor: "#FF3B30",
-  defaultSize: 4,
-};
+export type { ScreenDrawSettings, ToolbarPosition } from "./settings-schema.js";
 
 function settingsFilePath(): string {
   return path.join(app.getPath("userData"), "screen-draw-settings.json");
 }
 
 let cached: ScreenDrawSettings | null = null;
-
-function coerce(raw: unknown): ScreenDrawSettings {
-  const value = (raw ?? {}) as Partial<Record<keyof ScreenDrawSettings, unknown>>;
-  return {
-    shortcut:
-      typeof value.shortcut === "string" && value.shortcut.trim()
-        ? value.shortcut
-        : DEFAULT_SETTINGS.shortcut,
-    defaultColor:
-      typeof value.defaultColor === "string" && value.defaultColor.trim()
-        ? value.defaultColor
-        : DEFAULT_SETTINGS.defaultColor,
-    defaultSize:
-      typeof value.defaultSize === "number" &&
-      Number.isFinite(value.defaultSize) &&
-      value.defaultSize > 0
-        ? value.defaultSize
-        : DEFAULT_SETTINGS.defaultSize,
-  };
-}
 
 export function getSettings(): ScreenDrawSettings {
   if (cached) {
@@ -62,7 +36,7 @@ export function getSettings(): ScreenDrawSettings {
     const filePath = settingsFilePath();
     if (fs.existsSync(filePath)) {
       const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-      cached = coerce(parsed);
+      cached = coerceSettings(parsed);
     } else {
       cached = { ...DEFAULT_SETTINGS };
     }
@@ -95,13 +69,22 @@ export function setShortcut(shortcut: string): ScreenDrawSettings {
 export function setDefaults(partial: {
   defaultColor?: string;
   defaultSize?: number;
+  /** null resets the toolbar to its default placement; undefined leaves it unchanged. */
+  toolbarPosition?: ToolbarPosition | null;
+  /** A custom color to record in the recent list (does not change the default color). */
+  recentColor?: string;
 }): ScreenDrawSettings {
   const current = getSettings();
   persist(
-    coerce({
+    coerceSettings({
       ...current,
       defaultColor: partial.defaultColor ?? current.defaultColor,
       defaultSize: partial.defaultSize ?? current.defaultSize,
+      toolbarPosition:
+        partial.toolbarPosition !== undefined ? partial.toolbarPosition : current.toolbarPosition,
+      recentColors: partial.recentColor
+        ? addRecentColor(current.recentColors, partial.recentColor)
+        : current.recentColors,
     }),
   );
   return getSettings();

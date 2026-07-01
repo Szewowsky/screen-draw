@@ -80,14 +80,29 @@ export function Button({
 export function ColorWell({
   value,
   onChange,
+  onCommit,
   size: _size,
   className,
   ...props
 }: Omit<InputHTMLAttributes<HTMLInputElement>, "onChange" | "size" | "type" | "value"> & {
   value: string;
   onChange: (value: string) => void;
+  /** Fires with the final color when the picker is dismissed (native change event). */
+  onCommit?: (value: string) => void;
   size?: "small" | "medium";
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // React's onChange maps to the continuous input event; the native change
+  // event fires once with the final color when the picker closes.
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input || !onCommit) return;
+    const handler = () => onCommit(input.value);
+    input.addEventListener("change", handler);
+    return () => input.removeEventListener("change", handler);
+  }, [onCommit]);
+
   return (
     <label
       className={clsx(
@@ -98,6 +113,7 @@ export function ColorWell({
     >
       <input
         {...props}
+        ref={inputRef}
         type="color"
         value={value}
         onChange={(event) => onChange(event.currentTarget.value)}
