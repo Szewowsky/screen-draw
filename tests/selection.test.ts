@@ -4,6 +4,7 @@ import {
   beginDrag,
   canRedo,
   canUndo,
+  cancelDrag,
   commitShape,
   createModel,
   deleteSelected,
@@ -90,6 +91,18 @@ describe("hitTest", () => {
     expect(hitTest([pen], { x: 25, y: 0 })).toBe(0);
     expect(hitTest([pen], { x: 50, y: 25 })).toBe(0);
     expect(hitTest([pen], { x: 10, y: 40 })).toBeNull();
+  });
+
+  it("hits an arrow on its arrowhead barbs, not just the shaft", () => {
+    const arrow = shape("arrow", [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+    ]);
+    // Wing endpoint of a size-4 arrow is ~(88, 7): 7px off the shaft, beyond
+    // the shaft radius (2 + tolerance 4 = 6), but on the painted barb.
+    expect(hitTest([arrow], { x: 88, y: 7 })).toBe(0);
+    expect(hitTest([arrow], { x: 88, y: -7 })).toBe(0);
+    expect(hitTest([arrow], { x: 88, y: 15 })).toBeNull();
   });
 
   it("resolves overlapping shapes to the topmost (last painted)", () => {
@@ -201,6 +214,25 @@ describe("move (drag)", () => {
 
     model = redo(model);
     expect(model.shapes[0].points[0]).toEqual({ x: 10, y: 50 });
+  });
+
+  it("cancelDrag restores the pre-drag position with nothing recorded in history", () => {
+    let model = modelWith([LINE, RECT]);
+    const undoDepth = model.undoStack.length;
+    model = selectShape(model, 0);
+    model = beginDrag(model, { x: 0, y: 0 });
+    model = updateDrag(model, { x: 200, y: 100 });
+    model = cancelDrag(model);
+    expect(model.drag).toBeNull();
+    expect(model.shapes[0]).toEqual(LINE); // back at the original position
+    expect(model.shapes[1]).toEqual(RECT);
+    expect(model.selectedIndex).toBe(0);
+    expect(model.undoStack).toHaveLength(undoDepth);
+  });
+
+  it("cancelDrag is a no-op when nothing is being dragged", () => {
+    const model = selectShape(modelWith([LINE]), 0);
+    expect(cancelDrag(model)).toBe(model);
   });
 
   it("records nothing in history for a zero-distance drag (plain selection click)", () => {

@@ -244,6 +244,22 @@ export function endDrag(model: DrawingModel): DrawingModel {
   };
 }
 
+/**
+ * Cancel the move: the shape returns to its pre-drag position and stays
+ * selected. Nothing is recorded in history.
+ */
+export function cancelDrag(model: DrawingModel): DrawingModel {
+  const drag = model.drag;
+  if (!drag) return model;
+  return {
+    ...model,
+    shapes: drag.baseShapes,
+    selectedIndex: drag.index,
+    drag: null,
+    revision: model.revision + 1,
+  };
+}
+
 /** Delete the selected shape. Undoable like any other operation. */
 export function deleteSelected(model: DrawingModel): DrawingModel {
   if (model.drag || model.selectedIndex === null) return model;
@@ -353,8 +369,15 @@ export function hitsShape(shape: Shape, point: Point): boolean {
     case "highlighter":
       return withinPolyline(point, pts, radius);
     case "line":
-    case "arrow":
       return distanceToSegment(point, a, b) <= radius;
+    case "arrow": {
+      if (distanceToSegment(point, a, b) <= radius) return true;
+      // The arrowhead wings are painted too — clicking the barbs should hit.
+      const [left, right] = arrowHeadPoints(a, b, shape.size);
+      return (
+        distanceToSegment(point, b, left) <= radius || distanceToSegment(point, b, right) <= radius
+      );
+    }
     case "rectangle": {
       const corners = [a, { x: b.x, y: a.y }, b, { x: a.x, y: b.y }, a];
       return withinPolyline(point, corners, radius);

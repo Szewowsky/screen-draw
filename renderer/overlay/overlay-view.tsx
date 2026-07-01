@@ -45,6 +45,7 @@ import {
   beginDrag,
   canRedo as modelCanRedo,
   canUndo as modelCanUndo,
+  cancelDrag,
   clearAll as modelClearAll,
   commitShape,
   createModel,
@@ -495,11 +496,11 @@ export function OverlayView() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        // Escape first drops the selection (or an in-progress move); only a
-        // second press exits drawing mode.
+        // Escape cancels an in-progress move (shape snaps back), then drops
+        // the selection; only a further press exits drawing mode.
         const model = modelRef.current;
         if (model.drag) {
-          applyModel(selectShape(endDrag(model), null));
+          applyModel(selectShape(cancelDrag(model), null));
           return;
         }
         if (model.selectedIndex !== null) {
