@@ -431,7 +431,7 @@ function FloatingToolbar({
       ref={barRef}
       className={
         "fixed z-30 flex h-10 items-center gap-1 rounded-[13px] border border-white/10 bg-[#1d1d1f]/95 px-2 shadow-[0_12px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl" +
-        (pos ? "" : " bottom-6 left-1/2 -translate-x-1/2")
+        (pos ? "" : " bottom-[88px] left-1/2 -translate-x-1/2")
       }
       style={pos ? { left: pos.x, top: pos.y } : undefined}
     >
@@ -507,7 +507,7 @@ function FloatingToolbar({
 
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="w-24">
+          <span className="w-20">
             <Slider
               variant="filled"
               size="small"
