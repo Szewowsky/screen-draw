@@ -19,10 +19,21 @@ import { getShortcutStatus, registerToggleShortcut } from "../services/shortcut.
 import {
   getActiveDisplayId,
   isOverlayActive,
+  isOverlaySticky,
   setOverlayActive,
   setOverlayActiveDisplay,
+  setOverlaySticky,
 } from "../windows/overlay-window.js";
 import { applyContentProtection } from "../windows/toolbar-window.js";
+
+/** The overlay state shape returned to and broadcast at renderers. */
+function overlayState() {
+  return {
+    active: isOverlayActive(),
+    sticky: isOverlaySticky(),
+    activeDisplayId: getActiveDisplayId(),
+  };
+}
 
 export function registerOverlayHandlers(): void {
   ipcMain.handle("overlay:setActive", async (event, active: unknown) => {
@@ -30,11 +41,19 @@ export function registerOverlayHandlers(): void {
       throw new Error("overlay:setActive expects a boolean");
     }
     await setOverlayActive(active, { sourceWindow: BrowserWindow.fromWebContents(event.sender) });
-    return { active: isOverlayActive(), activeDisplayId: getActiveDisplayId() };
+    return overlayState();
   });
 
   ipcMain.handle("overlay:getState", async () => {
-    return { active: isOverlayActive(), activeDisplayId: getActiveDisplayId() };
+    return overlayState();
+  });
+
+  // Pin the annotations (drawing → sticky). Sender-agnostic: the toolbar's pin
+  // button routes here via the shared toolbar:action handler, and the overlay's
+  // `S` shortcut invokes it directly.
+  ipcMain.handle("overlay:setSticky", async () => {
+    await setOverlaySticky();
+    return overlayState();
   });
 
   ipcMain.handle("overlay:setActiveDisplay", async (_event, displayId: unknown) => {
@@ -42,7 +61,7 @@ export function registerOverlayHandlers(): void {
       throw new Error("overlay:setActiveDisplay expects a display id");
     }
     await setOverlayActiveDisplay(displayId);
-    return { active: isOverlayActive(), activeDisplayId: getActiveDisplayId() };
+    return overlayState();
   });
 
   ipcMain.handle("settings:get", async (): Promise<ScreenDrawSettings> => {

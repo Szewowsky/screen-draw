@@ -4,8 +4,11 @@ All notable changes to Screen Draw are documented here. Feature descriptions liv
 
 ## [Unreleased]
 
+### Added
+- **Pin annotations (sticky mode)** — the toolbar's pin button or `S` pins what you've drawn: the annotations stay on screen (and in recordings) but the overlay becomes click-through, the toolbar hides, and `⌘Z` and every key go back to your normal apps. It's a third state between drawing and hidden. Resume with the global shortcut, the tray's **Toggle Drawing**, or the control panel — your shapes, selection, and undo history are intact; the panel button reads **Resume drawing** while pinned. A normal exit (`Esc` / **Stop drawing**) still hides everything and clears session ink.
+
 ### Changed
-- **Session ink** (`G`, formerly "vanishing ink"): ghost strokes now stay on screen at full opacity for the whole drawing session instead of fading out ~2 s after being drawn. They still stay out of undo history and are wiped by `C` (clear all) and when drawing mode ends. Better for tutorials, where a stroke used to disappear while you drew the next one.
+- **Session ink** (`G`, formerly "vanishing ink"): ghost strokes now stay on screen at full opacity for the whole drawing session instead of fading out ~2 s after being drawn. They still stay out of undo history and are wiped by `C` (clear all) and when drawing mode ends. Better for tutorials, where a stroke used to disappear while you drew the next one. Pinning the annotations keeps session ink on screen; it clears only on a full exit.
 
 ## 1.3.0 — 2026-07-02
 

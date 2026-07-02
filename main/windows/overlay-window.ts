@@ -19,6 +19,7 @@ import {
   resetToolbarHidden,
   showToolbarWindow,
 } from "./toolbar-window.js";
+import { nextMode, type OverlayMode } from "../services/overlay-mode.js";
 import { logger } from "../logger.js";
 
 interface OverlayActivationOptions {
@@ -27,7 +28,13 @@ interface OverlayActivationOptions {
 }
 
 const overlayWindows = new Map<number, BrowserWindow>();
-let active = false;
+/**
+ * Tri-state overlay mode. `drawing` is the interactive state; `sticky` keeps the
+ * ink visible but click-through with the toolbar hidden; `hidden` is off. The
+ * public `isOverlayActive()` maps `drawing → true`, so existing callers (focus,
+ * shortcuts, publishing gates) keep their old meaning.
+ */
+let mode: OverlayMode = "hidden";
 let activeDisplayId: number | null = null;
 let displayListenersRegistered = false;
 
@@ -162,13 +169,20 @@ async function syncOverlayWindows(): Promise<BrowserWindow[]> {
     broadcastActiveDisplay();
   }
 
-  if (active) {
+  // Both drawing and sticky keep the overlay windows visible; only sticky makes
+  // them click-through. A new display appearing mid-session must come up in the
+  // right state (visible + ignoring mouse in sticky), so this mirrors the same
+  // per-mode logic used when entering the mode.
+  if (mode === "drawing" || mode === "sticky") {
+    const ignoreMouse = mode === "sticky";
     for (const display of displays) {
       const win = overlayWindows.get(display.id);
       if (!win || win.isDestroyed()) continue;
       fitToDisplay(win, display);
-      win.setIgnoreMouseEvents(false);
-      if (display.id === activeDisplayId) {
+      win.setIgnoreMouseEvents(ignoreMouse);
+      // In sticky the overlays never take focus (they must not steal it from the
+      // app the user is now working in), so every window shows inactive.
+      if (mode === "drawing" && display.id === activeDisplayId) {
         win.show();
       } else {
         win.showInactive();
@@ -178,8 +192,8 @@ async function syncOverlayWindows(): Promise<BrowserWindow[]> {
       fitToDisplay(win, display);
       win.moveTop();
     }
-    // Keep the toolbar above the re-shown overlays (same screen-saver level).
-    showToolbarWindow(activeDisplayId);
+    // The toolbar only belongs to drawing mode; sticky hides it.
+    if (mode === "drawing") showToolbarWindow(activeDisplayId);
   }
 
   return windows;
@@ -213,8 +227,18 @@ export async function createOverlayWindow(): Promise<BrowserWindow> {
   return first;
 }
 
+/** Backward-compatible: true only in interactive drawing mode. */
 export function isOverlayActive(): boolean {
-  return active;
+  return mode === "drawing";
+}
+
+/** True when annotations are pinned (visible but click-through). */
+export function isOverlaySticky(): boolean {
+  return mode === "sticky";
+}
+
+export function getOverlayMode(): OverlayMode {
+  return mode;
 }
 
 /**
@@ -223,7 +247,7 @@ export function isOverlayActive(): boolean {
  * keep focus off the overlay, starving its single-key shortcuts.
  */
 export function focusActiveOverlay(): void {
-  if (!active || activeDisplayId === null) return;
+  if (mode !== "drawing" || activeDisplayId === null) return;
   const win = overlayWindows.get(activeDisplayId);
   if (win && !win.isDestroyed()) win.focus();
 }
@@ -240,7 +264,7 @@ export async function setOverlayActiveDisplay(displayId: number): Promise<void> 
   activeDisplayId = displayId;
   broadcastActiveDisplay();
 
-  if (active) {
+  if (mode === "drawing") {
     await syncOverlayWindows();
     const win = overlayWindows.get(displayId);
     if (win && !win.isDestroyed()) {
@@ -257,62 +281,117 @@ export async function setOverlayActiveDisplay(displayId: number): Promise<void> 
   logger.info("overlay", `Active drawing display changed to ${displayId}`);
 }
 
+/** Enter interactive drawing: overlays visible + interactive, toolbar + shortcuts on. */
+async function enterDrawing(options: OverlayActivationOptions): Promise<void> {
+  activeDisplayId = getDisplayIdForActivation(options);
+
+  for (const [displayId, win] of overlayWindows) {
+    const display = getDisplayById(displayId);
+    if (!display || win.isDestroyed()) continue;
+    fitToDisplay(win, display);
+    win.setIgnoreMouseEvents(false);
+    if (displayId === activeDisplayId) {
+      win.show();
+    } else {
+      win.showInactive();
+    }
+    // macOS can re-constrain the frame while showing (nudging it below the
+    // menu bar); re-fit after show so the overlay covers the whole display.
+    fitToDisplay(win, display);
+    win.moveTop();
+  }
+
+  // The overlay is usually toggled via a global shortcut while another app is
+  // frontmost. Without activating our app, macOS keeps keyboard focus on that
+  // app — clicks still register (acceptFirstMouse) but keydown shortcuts don't
+  // reach the overlay. Steal focus so keyboard shortcuts work immediately.
+  app.focus({ steal: true });
+  overlayWindows.get(activeDisplayId)?.focus();
+  await registerDrawingShortcuts();
+
+  // Re-entering drawing mode always reveals the toolbar (the `T` toggle is
+  // session-only). Raise it after the overlays so it stays clickable above
+  // them (same screen-saver level).
+  resetToolbarHidden();
+  showToolbarWindow(activeDisplayId);
+  // Keep keyboard focus on the active overlay: showing the toolbar must not
+  // steal the focus that the overlay's single-key shortcuts depend on.
+  overlayWindows.get(activeDisplayId)?.focus();
+}
+
+/**
+ * Pin the annotations: keep the overlay windows VISIBLE but make them
+ * click-through, hide the toolbar, and release the drawing shortcuts so the
+ * user's apps get mouse and keyboard back. The overlays keep their shapes — the
+ * renderer clears only the ephemeral session ink on a FULL exit, not on pinning.
+ */
+function enterSticky(): void {
+  unregisterDrawingShortcuts();
+  hideToolbarWindow();
+
+  for (const [displayId, win] of overlayWindows) {
+    const display = getDisplayById(displayId);
+    if (!display || win.isDestroyed()) continue;
+    fitToDisplay(win, display);
+    // Click-through: pointer events fall through to whatever is underneath.
+    win.setIgnoreMouseEvents(true);
+    // Stay visible but never take focus — the user is now working in another app.
+    win.showInactive();
+    fitToDisplay(win, display);
+    win.moveTop();
+    logger.info("overlay", `Overlay ${displayId} setIgnoreMouseEvents(true) (sticky)`);
+  }
+
+  // Drop the focus we were holding so keyboard events reach the frontmost app.
+  overlayWindows.get(activeDisplayId ?? -1)?.blur();
+}
+
+/** Full exit: hide everything and release the drawing shortcuts. */
+function enterHidden(): void {
+  unregisterDrawingShortcuts();
+  hideToolbarWindow();
+  for (const win of overlayWindows.values()) {
+    if (!win.isDestroyed()) win.hide();
+  }
+}
+
+/** Apply a target mode: run the matching side effects and broadcast the change. */
+async function applyMode(next: OverlayMode, options: OverlayActivationOptions = {}): Promise<void> {
+  // Set the mode BEFORE syncing so syncOverlayWindows runs the target mode's
+  // window block (e.g. a pin doesn't first run the drawing show-block — toolbar
+  // up, overlay focused — only for enterSticky to immediately reverse it).
+  mode = next;
+
+  await syncOverlayWindows();
+
+  if (next === "drawing") await enterDrawing(options);
+  else if (next === "sticky") enterSticky();
+  else enterHidden();
+
+  broadcast("overlay:active-changed", {
+    active: mode === "drawing",
+    sticky: mode === "sticky",
+    activeDisplayId,
+  });
+  broadcastActiveDisplay();
+  logger.info("overlay", `Drawing overlay mode → ${mode}`);
+}
+
 export async function setOverlayActive(
   next: boolean,
   options: OverlayActivationOptions = {},
 ): Promise<void> {
-  await syncOverlayWindows();
+  // The boolean contract stays literal: true → drawing, false → hidden.
+  await applyMode(next ? "drawing" : "hidden", options);
+}
 
-  active = next;
-
-  if (next) {
-    activeDisplayId = getDisplayIdForActivation(options);
-
-    for (const [displayId, win] of overlayWindows) {
-      const display = getDisplayById(displayId);
-      if (!display || win.isDestroyed()) continue;
-      fitToDisplay(win, display);
-      win.setIgnoreMouseEvents(false);
-      if (displayId === activeDisplayId) {
-        win.show();
-      } else {
-        win.showInactive();
-      }
-      // macOS can re-constrain the frame while showing (nudging it below the
-      // menu bar); re-fit after show so the overlay covers the whole display.
-      fitToDisplay(win, display);
-      win.moveTop();
-    }
-
-    // The overlay is usually toggled via a global shortcut while another app is
-    // frontmost. Without activating our app, macOS keeps keyboard focus on that
-    // app — clicks still register (acceptFirstMouse) but keydown shortcuts don't
-    // reach the overlay. Steal focus so keyboard shortcuts work immediately.
-    app.focus({ steal: true });
-    overlayWindows.get(activeDisplayId)?.focus();
-    await registerDrawingShortcuts();
-
-    // Re-entering drawing mode always reveals the toolbar (the `T` toggle is
-    // session-only). Raise it after the overlays so it stays clickable above
-    // them (same screen-saver level).
-    resetToolbarHidden();
-    showToolbarWindow(activeDisplayId);
-    // Keep keyboard focus on the active overlay: showing the toolbar must not
-    // steal the focus that the overlay's single-key shortcuts depend on.
-    overlayWindows.get(activeDisplayId)?.focus();
-  } else {
-    unregisterDrawingShortcuts();
-    hideToolbarWindow();
-    for (const win of overlayWindows.values()) {
-      if (!win.isDestroyed()) win.hide();
-    }
-  }
-
-  broadcast("overlay:active-changed", { active, activeDisplayId });
-  broadcastActiveDisplay();
-  logger.info("overlay", `Drawing overlay ${active ? "activated" : "deactivated"}`);
+/** Pin the annotations (drawing → sticky); a no-op from any other mode. */
+export async function setOverlaySticky(): Promise<void> {
+  await applyMode(nextMode(mode, "pin"));
 }
 
 export async function toggleOverlay(options: OverlayActivationOptions = {}): Promise<void> {
-  await setOverlayActive(!active, options);
+  // Routed through the pure transition so sticky → drawing (resume) and
+  // hidden ↔ drawing all follow one table.
+  await applyMode(nextMode(mode, "toggle"), options);
 }

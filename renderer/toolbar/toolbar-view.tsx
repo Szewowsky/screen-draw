@@ -388,6 +388,7 @@ export function ToolbarView() {
             setVanishing((v) => !v);
             action({ type: "toggleVanishing" });
           }}
+          onPin={() => action({ type: "pin" })}
           hideInRecordings={hideInRecordings}
           onHideInRecordingsToggle={() => {
             void window.screenDraw.ipc.invoke("settings:setDefaults", {

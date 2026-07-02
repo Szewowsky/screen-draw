@@ -43,6 +43,7 @@ import {
   Minus,
   MousePointer2,
   Pencil,
+  Pin,
   Redo2,
   Square,
   Undo2,
@@ -82,6 +83,8 @@ interface FloatingToolbarProps {
   onSizeChange: (size: number) => void;
   vanishing: boolean;
   onVanishingToggle: () => void;
+  /** Pin the annotations: leave them on screen but click-through (sticky mode). */
+  onPin: () => void;
   /** Whether the toolbar window is hidden from screen recordings (content protection). */
   hideInRecordings: boolean;
   /** Toggle the hidden-in-recordings state (atomic flip in main). */
@@ -119,6 +122,7 @@ export function FloatingToolbar({
   onSizeChange,
   vanishing,
   onVanishingToggle,
+  onPin,
   hideInRecordings,
   onHideInRecordingsToggle,
   onGripDrag,
@@ -405,6 +409,22 @@ export function FloatingToolbar({
           </Button>
         </TooltipTrigger>
         <TooltipContent shortcut={["⇧", "R"]}>Hidden in recordings</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="transparent"
+            size="small"
+            iconOnly
+            className="!size-6"
+            onClick={onPin}
+            aria-label="Pin annotations"
+          >
+            <Pin className="size-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent shortcut={["S"]}>Pin annotations</TooltipContent>
       </Tooltip>
 
       <Separator orientation="vertical" />

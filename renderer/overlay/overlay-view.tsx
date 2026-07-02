@@ -35,6 +35,8 @@ import {
 } from "./drawing-model";
 
 interface OverlayWindowState {
+  active?: boolean;
+  sticky?: boolean;
   activeDisplayId?: number | null;
 }
 
@@ -158,6 +160,10 @@ export function OverlayView() {
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const modelRef = useRef<DrawingModel>(createModel());
   const drawingRef = useRef(false);
+  // Whether this overlay is in interactive drawing mode. In sticky the windows
+  // stay visible (and may still hold focus right after pinning), so the keydown
+  // handler must early-out — otherwise `C`/`T`/⌘Z would act on the pinned ink.
+  const activeRef = useRef(false);
   const displayIdRef = useRef(getOverlayDisplayId());
 
   const [tool, setTool] = useState<OverlayTool>("pen");
@@ -414,6 +420,7 @@ export function OverlayView() {
     void (async () => {
       try {
         const state = await window.screenDraw.ipc.invoke<OverlayWindowState>("overlay:getState");
+        activeRef.current = state.active === true;
         const nextDisplayId = normalizeDisplayId(state.activeDisplayId);
         activeDisplayIdRef.current = nextDisplayId;
         setActiveDisplayId(nextDisplayId);
@@ -431,15 +438,30 @@ export function OverlayView() {
     return () => unsub?.();
   }, []);
 
-  // Deactivating drops any session ink from the prior session. (The toolbar's
-  // session-hidden reset now lives in main, which re-shows the toolbar window on
-  // re-activation.)
+  // Cancel any in-progress work and drop the selection so a dashed indicator or a
+  // half-drawn stroke never floats over the user's normal work. Run on every
+  // overlay (a selection can live on a non-active display). Session ink stays.
+  const cancelInteraction = useCallback(() => {
+    drawingRef.current = false;
+    applyModel(selectShape(cancelDrag(discardCurrent(modelRef.current)), null));
+  }, [applyModel]);
+
+  // Follow the tri-state broadcast. A FULL exit (hidden: !active && !sticky)
+  // drops the prior session's ink; PINNING (sticky) keeps the ink but cancels any
+  // selection / in-progress stroke before the overlay goes click-through.
+  // `activeRef` gates the keydown handler so pinned overlays ignore keys even
+  // while they briefly still hold focus. (The toolbar's session-hidden reset now
+  // lives in main, which re-shows the toolbar window on re-activation.)
   useEffect(() => {
     const unsub = window.screenDraw.ipc.on("overlay:active-changed", (params) => {
-      if (!(params as { active?: boolean } | undefined)?.active) clearEphemerals();
+      const p = (params as OverlayWindowState | undefined) ?? {};
+      activeRef.current = p.active === true;
+      if (p.active) return;
+      if (p.sticky) cancelInteraction();
+      else clearEphemerals();
     });
     return () => unsub?.();
-  }, [clearEphemerals]);
+  }, [clearEphemerals, cancelInteraction]);
 
   // Publish this overlay's full toolbar-facing state to the toolbar window
   // (relayed via main) whenever it changes AND this display is active. The
@@ -641,6 +663,10 @@ export function OverlayView() {
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
+      // Only interactive drawing mode consumes keys. In sticky the overlay stays
+      // visible (and may still hold focus just after pinning), but every key —
+      // ⌘Z, C, T, Esc — must reach the app underneath instead of the pinned ink.
+      if (!activeRef.current) return;
       if (e.key === "Escape") {
         e.preventDefault();
         // Escape cancels an in-progress move (shape snaps back), then drops
@@ -716,6 +742,14 @@ export function OverlayView() {
       if (key === "g") {
         e.preventDefault();
         toggleVanishing();
+        return;
+      }
+
+      // S pins the annotations (drawing → sticky). Same window-management path as
+      // the toolbar's pin button; main runs the lifecycle and broadcasts back.
+      if (key === "s") {
+        e.preventDefault();
+        void window.screenDraw.ipc.invoke("overlay:setSticky");
         return;
       }
 

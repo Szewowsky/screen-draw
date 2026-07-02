@@ -24,7 +24,11 @@
 import { ipcMain } from "electron";
 
 import { broadcast } from "../services/events.js";
-import { getActiveDisplayId, focusActiveOverlay } from "../windows/overlay-window.js";
+import {
+  getActiveDisplayId,
+  focusActiveOverlay,
+  setOverlaySticky,
+} from "../windows/overlay-window.js";
 import {
   getActiveWorkArea,
   setToolbarBounds,
@@ -71,6 +75,14 @@ export function registerToolbarHandlers(): void {
     // Window-management actions handled locally; not relayed to overlays.
     if (type === "toggleHidden") {
       toggleToolbarHidden(getActiveDisplayId());
+      return;
+    }
+
+    // Pin the annotations (drawing → sticky). Overlay lifecycle, not a drawing
+    // action, so it is handled here rather than relayed. The overlay clears its
+    // selection / in-progress stroke off the active-changed broadcast.
+    if (type === "pin") {
+      await setOverlaySticky();
       return;
     }
 

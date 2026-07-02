@@ -8,6 +8,16 @@ Toggle with the global shortcut (default **⌘⇧D**, configurable in the contro
 
 **Multi-display:** each display has its own canvas — shapes belong to the display they were drawn on. Moving the cursor onto a display makes it active: the toolbar and keyboard shortcuts follow the pointer. Undo/redo apply to the active display.
 
+## Three states: drawing, pinned, hidden
+
+Screen Draw is in one of three states:
+
+- **Drawing** — the normal interactive state above: overlays cover every display, the toolbar is visible, and `⌘Z`/`⌘⇧Z` and the single-key shortcuts drive the canvas.
+- **Pinned (sticky)** — press the toolbar's **pin** button or `S`. Your annotations stay on screen (and in recordings) but the overlay becomes **click-through**: you click, type, and scroll in your normal apps straight through the drawings. The toolbar hides and `⌘Z` and every other key go back to those apps. Nothing is erased — the shapes, your selection, and the undo history are kept. Any in-progress stroke and the selection indicator are cleared first, so nothing dashed floats over your work. Session ink stays on screen while pinned.
+- **Hidden** — off. Nothing on screen.
+
+**Resuming from pinned:** the global shortcut, the tray's **Toggle Drawing**, and the control panel button all return you to drawing with everything intact — the panel button reads **Resume drawing** while pinned. A normal exit from drawing (`Esc` or **Stop drawing**) still goes all the way to hidden and clears session ink; pinning is an alternative exit that leaves the ink up.
+
 ## Tools
 
 | Tool | Key | Notes |
@@ -53,6 +63,7 @@ A separate always-on-top bar on the active display, draggable by its grip; the p
 
 | Action | Key |
 |---|---|
+| Pin annotations (sticky, click-through) | `S` |
 | Hide / show the toolbar (this session) | `T` |
 | Reset toolbar to the default position | `⇧T` |
 | Toggle "hidden in screen recordings" | `⇧R` |

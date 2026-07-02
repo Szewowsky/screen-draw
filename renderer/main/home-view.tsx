@@ -90,6 +90,7 @@ const SHORTCUT_ROWS: { label: string; keys: ReactNode }[] = [
     ),
   },
   { label: "Session ink", keys: <Key>G</Key> },
+  { label: "Pin annotations", keys: <Key>S</Key> },
   { label: "Hide/show toolbar", keys: <Key>T</Key> },
   {
     label: "Reset toolbar position",
@@ -152,6 +153,7 @@ function ShortcutKeys({ accelerator }: { accelerator: string }) {
 export function HomeView() {
   const queryClient = useQueryClient();
   const [active, setActive] = useState(false);
+  const [sticky, setSticky] = useState(false);
   const [capturing, setCapturing] = useState(false);
 
   const { data: settings } = useQuery({
@@ -201,13 +203,18 @@ export function HomeView() {
     return () => unsub();
   }, [queryClient]);
 
-  // Track overlay active state broadcast from the backend.
+  // Track overlay tri-state (drawing / sticky / hidden) broadcast from the backend.
   useEffect(() => {
     void window.screenDraw.ipc
-      .invoke<{ active: boolean }>("overlay:getState")
-      .then((s) => setActive(s.active));
+      .invoke<{ active: boolean; sticky?: boolean }>("overlay:getState")
+      .then((s) => {
+        setActive(s.active);
+        setSticky(Boolean(s.sticky));
+      });
     const unsub = window.screenDraw.ipc.on("overlay:active-changed", (params) => {
-      setActive(Boolean((params as { active?: boolean })?.active));
+      const p = params as { active?: boolean; sticky?: boolean } | undefined;
+      setActive(Boolean(p?.active));
+      setSticky(Boolean(p?.sticky));
     });
     return () => unsub();
   }, []);
@@ -257,7 +264,7 @@ export function HomeView() {
             recordings.
           </Text>
           <Button variant="accent" size="large" className="w-full" onClick={toggleDrawing}>
-            {active ? "Stop drawing" : "Start drawing"}
+            {active ? "Stop drawing" : sticky ? "Resume drawing" : "Start drawing"}
           </Button>
           <div className="flex items-center justify-center gap-2">
             <Text variant="small" color="tertiary">
