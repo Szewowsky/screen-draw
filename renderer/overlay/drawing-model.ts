@@ -130,10 +130,11 @@ function pushHistory(
 }
 
 /**
- * Discard the in-progress shape without committing it. Used by session ink,
- * which pulls the finished shape into its own ephemeral list rather than the
- * model. The committed set is untouched, so `revision` is left as-is (the cached
- * committed layer stays valid) and undo/redo never see the discarded shape.
+ * Discard the in-progress shape without committing it. Used when an interaction
+ * is cancelled (e.g. pinning while mid-stroke), so a half-drawn shape never
+ * floats over the user's work. The committed set is untouched, so `revision` is
+ * left as-is (the cached committed layer stays valid) and undo/redo never see
+ * the discarded shape.
  */
 export function discardCurrent(model: DrawingModel): DrawingModel {
   return model.current ? { ...model, current: null } : model;

@@ -47,7 +47,6 @@ interface ToolbarState {
   canUndo: boolean;
   canRedo: boolean;
   hasShapes: boolean;
-  hasEphemerals: boolean;
   vanishing: boolean;
   toolbarPosition: { x: number; y: number } | null;
   workArea: WorkArea;
@@ -88,7 +87,6 @@ export function ToolbarView() {
     canUndo: false,
     canRedo: false,
     hasShapes: false,
-    hasEphemerals: false,
   });
   const [vanishing, setVanishing] = useState(false);
   const [hideInRecordings, setHideInRecordings] = useState(false);
@@ -197,7 +195,6 @@ export function ToolbarView() {
         canUndo: raw.canUndo === true,
         canRedo: raw.canRedo === true,
         hasShapes: raw.hasShapes === true,
-        hasEphemerals: raw.hasEphemerals === true,
       });
       // Work area / position may have changed (display switch); re-place.
       reportBounds();
@@ -401,7 +398,7 @@ export function ToolbarView() {
           onUndo={() => action({ type: "undo" })}
           canRedo={history.canRedo}
           onRedo={() => action({ type: "redo" })}
-          canClear={history.hasShapes || history.hasEphemerals}
+          canClear={history.hasShapes}
           onClear={() => action({ type: "clear" })}
           onExit={() => action({ type: "exit" })}
         />

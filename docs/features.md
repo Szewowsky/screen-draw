@@ -13,10 +13,10 @@ Toggle with the global shortcut (default **⌘⇧D**, configurable in the contro
 Screen Draw is in one of three states:
 
 - **Drawing** — the normal interactive state above: overlays cover every display, the toolbar is visible, and `⌘Z`/`⌘⇧Z` and the single-key shortcuts drive the canvas.
-- **Pinned (sticky)** — press the toolbar's **pin** button or `S`. Your annotations stay on screen (and in recordings) but the overlay becomes **click-through**: you click, type, and scroll in your normal apps straight through the drawings. The toolbar hides and `⌘Z` and every other key go back to those apps. Nothing is erased — the shapes, your selection, and the undo history are kept. Any in-progress stroke and the selection indicator are cleared first, so nothing dashed floats over your work. Session ink stays on screen while pinned.
+- **Pinned (sticky)** — press the toolbar's **pin** button or `S`. Your annotations stay on screen (and in recordings) but the overlay becomes **click-through**: you click, type, and scroll in your normal apps straight through the drawings. The toolbar hides and `⌘Z` and every other key go back to those apps. Nothing is erased — the shapes, your selection, and the undo history are kept, and pinning never wipes the canvas even with [session ink](#session-ink-duszek--g) on. Any in-progress stroke and the selection indicator are cleared first, so nothing dashed floats over your work.
 - **Hidden** — off. Nothing on screen.
 
-**Resuming from pinned:** the global shortcut, the tray's **Toggle Drawing**, and the control panel button all return you to drawing with everything intact — the panel button reads **Resume drawing** while pinned. A normal exit from drawing (`Esc` or **Stop drawing**) still goes all the way to hidden and clears session ink; pinning is an alternative exit that leaves the ink up.
+**Resuming from pinned:** the global shortcut, the tray's **Toggle Drawing**, and the control panel button all return you to drawing with everything intact — the panel button reads **Resume drawing** while pinned. A normal exit from drawing (`Esc` or **Stop drawing**) still goes all the way to hidden; with [session ink](#session-ink-duszek--g) on that also wipes the canvas to a clean slate, whereas pinning is an alternative exit that always leaves the annotations up.
 
 ## Tools
 
@@ -40,14 +40,14 @@ Brush size: `[` / `]` or the toolbar slider (1–24 px).
 
 ## Session ink („duszek") — `G`
 
-Toggle with the ghost button in the toolbar or `G`. While on, everything you draw (any tool) stays on screen at full opacity for the whole drawing session — no auto-fade, no timer. Session-ink strokes never enter undo history (so `⌘Z` skips them); `C` (clear all) wipes them along with committed shapes, and they also vanish when you exit drawing mode. Turning the mode off leaves existing session ink on screen; new strokes just commit normally again. The toggle is remembered for the whole app session.
+Toggle with the ghost button in the toolbar or `G`. While it's on, **drawing works exactly like normal** — every stroke commits to the canvas and is selectable (`V`), restylable, movable, deletable, and fully undoable/redoable with `⌘Z`. The only difference: when you **fully exit** drawing (`Esc`, **Stop drawing**, or the global toggle) with session ink on, the canvas **and** undo history reset to a clean slate, so the next time you start drawing you begin fresh. **Pinning (`S`) does not wipe** — pinned annotations stay on screen. Turn session ink off and everything persists across hide/show exactly as it always has. The toggle is remembered for the whole app session.
 
-Made for live streams and tutorials: sketch quick throwaway marks that persist while you talk, then clear the lot with `C` when you're done — without cluttering undo history.
+Made for live streams and tutorials: annotate freely during a segment, then just stop drawing to wipe the slate before the next one — no manual clearing, and everything stays editable while you work.
 
 ## Undo / redo / clear
 
 - **⌘Z** undo, **⌘⇧Z** redo — work globally while drawing (registered as system-wide shortcuts). Moves, deletes, and clear-all are undoable; history holds the last 100 operations per display.
-- **`C`** clears the active display's canvas (undoable; also wipes session ink).
+- **`C`** clears the active display's canvas (undoable).
 
 ## Escape layering
 

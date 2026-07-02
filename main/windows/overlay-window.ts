@@ -322,8 +322,8 @@ async function enterDrawing(options: OverlayActivationOptions): Promise<void> {
 /**
  * Pin the annotations: keep the overlay windows VISIBLE but make them
  * click-through, hide the toolbar, and release the drawing shortcuts so the
- * user's apps get mouse and keyboard back. The overlays keep their shapes — the
- * renderer clears only the ephemeral session ink on a FULL exit, not on pinning.
+ * user's apps get mouse and keyboard back. The overlays keep their shapes —
+ * pinning never wipes; only a FULL exit with session ink ON resets the model.
  */
 function enterSticky(): void {
   unregisterDrawingShortcuts();

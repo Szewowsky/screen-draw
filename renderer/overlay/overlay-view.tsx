@@ -186,10 +186,12 @@ export function OverlayView() {
   const activeDisplayIdRef = useRef<number | null>(activeDisplayId);
   activeDisplayIdRef.current = activeDisplayId;
 
-  // Session ink (`G`). While ON, a finished stroke is not committed to the
-  // model/history — it joins the ephemeral list and stays on screen at full
-  // opacity until cleared. State for publishing to the toolbar; mirrored to a ref
-  // for the once-bound pointer handler. Sticky across re-activation.
+  // Session ink (`G`). Drawing behaves EXACTLY like normal drawing while this is
+  // ON — strokes commit to the model and are selectable/restylable/undoable. The
+  // toggle's only effect: on a FULL exit (see the active-changed listener) it
+  // resets this overlay's model to a clean slate. State for publishing to the
+  // toolbar; mirrored to a ref so the active-changed listener reads the live flag
+  // without re-subscribing on every toggle. Sticky across re-activation.
   const [vanishing, setVanishing] = useState(false);
   const vanishingRef = useRef(vanishing);
   vanishingRef.current = vanishing;
@@ -201,17 +203,6 @@ export function OverlayView() {
   toolRef.current = tool;
   colorRef.current = color;
   sizeRef.current = size;
-
-  // Finished session-ink shapes, held in a ref (never state) so the stable
-  // `redraw` always reads the live list. They persist at full opacity until
-  // cleared — no fade, no timer, no rAF loop.
-  const ephemeralsRef = useRef<readonly Shape[]>([]);
-
-  // Mirror of "are there any session-ink strokes on screen?" as state, so the
-  // toolbar's Clear button can enable on ephemerals alone (they never enter the
-  // model/history). Kept in sync at the two ephemeral-list transitions below; the
-  // ref stays the source of truth for rendering.
-  const [hasEphemerals, setHasEphemerals] = useState(false);
 
   // Committed shapes are rasterized once into this offscreen layer and
   // re-rasterized only when the committed set changes (model revision) or the
@@ -255,11 +246,6 @@ export function OverlayView() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(layer.canvas, 0, 0);
     ctx.restore();
-    // Session-ink shapes render on top of the committed layer at full opacity,
-    // persisting until cleared.
-    for (const shape of ephemeralsRef.current) {
-      drawShape(ctx, shape);
-    }
     if (model.current) {
       drawShape(ctx, model.current);
     }
@@ -302,16 +288,6 @@ export function OverlayView() {
     [redraw],
   );
 
-  // Forget any session-ink strokes and repaint. Used when clearing and when
-  // drawing mode deactivates — never on a plain session-ink toggle. The repaint
-  // wipes them off the retained bitmap (the deactivate path has no other redraw;
-  // the clear path repaints anyway).
-  const clearEphemerals = useCallback(() => {
-    ephemeralsRef.current = [];
-    setHasEphemerals(false);
-    redraw();
-  }, [redraw]);
-
   const setupCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -349,13 +325,12 @@ export function OverlayView() {
   }, [applyModel]);
 
   const clearAll = useCallback(() => {
-    // Clear means clear: committed shapes and any session ink both go.
-    clearEphemerals();
     applyModel(modelClearAll(modelRef.current));
-  }, [applyModel, clearEphemerals]);
+  }, [applyModel]);
 
   const toggleVanishing = useCallback(() => {
-    // Toggling only flips the mode; existing session-ink strokes stay on screen.
+    // Toggling only flips the mode; drawn shapes stay untouched. The flag is
+    // consulted only on a full exit, where it decides whether to wipe the model.
     setVanishing((v) => !v);
   }, []);
 
@@ -440,28 +415,38 @@ export function OverlayView() {
 
   // Cancel any in-progress work and drop the selection so a dashed indicator or a
   // half-drawn stroke never floats over the user's normal work. Run on every
-  // overlay (a selection can live on a non-active display). Session ink stays.
+  // overlay (a selection can live on a non-active display). Committed shapes stay.
   const cancelInteraction = useCallback(() => {
     drawingRef.current = false;
     applyModel(selectShape(cancelDrag(discardCurrent(modelRef.current)), null));
   }, [applyModel]);
 
-  // Follow the tri-state broadcast. A FULL exit (hidden: !active && !sticky)
-  // drops the prior session's ink; PINNING (sticky) keeps the ink but cancels any
-  // selection / in-progress stroke before the overlay goes click-through.
-  // `activeRef` gates the keydown handler so pinned overlays ignore keys even
-  // while they briefly still hold focus. (The toolbar's session-hidden reset now
-  // lives in main, which re-shows the toolbar window on re-activation.)
+  // Follow the tri-state broadcast. On a FULL exit (hidden: !active && !sticky)
+  // with session ink ON, this overlay resets its model to a clean slate — canvas
+  // and undo history wiped for the next session (session ink OFF persists as
+  // always). PINNING (sticky) never wipes; it only cancels any selection /
+  // in-progress stroke before the overlay goes click-through. `activeRef` gates
+  // the keydown handler so pinned overlays ignore keys even while they briefly
+  // still hold focus. (The toolbar's session-hidden reset now lives in main,
+  // which re-shows the toolbar window on re-activation.)
+  //
+  // The listener is intentionally NOT gated on isThisActiveDisplay, so EVERY
+  // display's overlay reacts. Each overlay decides the wipe from its OWN
+  // `vanishingRef` (read via the ref so a `G` toggle never re-subscribes this
+  // effect). A `G` toggle only reaches the active display's overlay (the
+  // toolbar:action gate), so on multi-display setups only that overlay's flag is
+  // set — per-display consistency follows the toolbar's per-display toggling.
+  // Single-display users never notice.
   useEffect(() => {
     const unsub = window.screenDraw.ipc.on("overlay:active-changed", (params) => {
       const p = (params as OverlayWindowState | undefined) ?? {};
       activeRef.current = p.active === true;
       if (p.active) return;
       if (p.sticky) cancelInteraction();
-      else clearEphemerals();
+      else if (vanishingRef.current) applyModel(createModel());
     });
     return () => unsub?.();
-  }, [clearEphemerals, cancelInteraction]);
+  }, [applyModel, cancelInteraction]);
 
   // Publish this overlay's full toolbar-facing state to the toolbar window
   // (relayed via main) whenever it changes AND this display is active. The
@@ -478,7 +463,6 @@ export function OverlayView() {
       canUndo: historyState.canUndo,
       canRedo: historyState.canRedo,
       hasShapes: historyState.hasShapes,
-      hasEphemerals,
       vanishing,
     });
   }, [
@@ -488,7 +472,6 @@ export function OverlayView() {
     selectionStyle,
     recentColors,
     historyState,
-    hasEphemerals,
     vanishing,
     isThisActiveDisplay,
   ]);
@@ -650,15 +633,6 @@ export function OverlayView() {
       }
       if (!drawingRef.current) return;
       drawingRef.current = false;
-      if (vanishingRef.current && model.current) {
-        // Session ink: the finished shape never enters the model/history — it
-        // joins the ephemeral list and stays on screen until cleared.
-        ephemeralsRef.current = [...ephemeralsRef.current, model.current];
-        setHasEphemerals(true);
-        // applyModel repaints; the ephemeral is already in the ref, so it shows.
-        applyModel(discardCurrent(model));
-        return;
-      }
       applyModel(commitShape(model));
     };
 
