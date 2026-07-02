@@ -2,7 +2,7 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
-## [Unreleased]
+## 1.4.0 — 2026-07-02
 
 ### Added
 - **Pin annotations (sticky mode)** — the toolbar's pin button or `S` pins what you've drawn: the annotations stay on screen (and in recordings) but the overlay becomes click-through, the toolbar hides, and `⌘Z` and every key go back to your normal apps. It's a third state between drawing and hidden. Resume with the global shortcut, the tray's **Toggle Drawing**, or the control panel — your shapes, selection, and undo history are intact; the panel button reads **Resume drawing** while pinned. A normal exit (`Esc` / **Stop drawing**) still hides everything and clears session ink.
