@@ -33,7 +33,6 @@ import {
   type Point,
   type Shape,
 } from "./drawing-model";
-import { addEphemeral, ephemeralAlpha, pruneEphemerals, type Ephemeral } from "./ephemeral";
 
 interface OverlayWindowState {
   activeDisplayId?: number | null;
@@ -96,12 +95,8 @@ function drawArrowHead(ctx: CanvasRenderingContext2D, from: Point, to: Point, si
   ctx.stroke();
 }
 
-/**
- * Paint `shape` onto `ctx`. `alphaScale` (default 1) multiplies the tool's own
- * opacity, so a fading ephemeral dims correctly for both the highlighter's 0.35
- * band and the fully opaque tools.
- */
-function drawShape(ctx: CanvasRenderingContext2D, shape: Shape, alphaScale = 1) {
+/** Paint `shape` onto `ctx` at the tool's own opacity (0.35 for the highlighter). */
+function drawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
   const { points: pts } = shape;
   if (pts.length === 0) return;
 
@@ -111,10 +106,10 @@ function drawShape(ctx: CanvasRenderingContext2D, shape: Shape, alphaScale = 1) 
   ctx.fillStyle = shape.color;
 
   if (shape.tool === "highlighter") {
-    ctx.globalAlpha = 0.35 * alphaScale;
+    ctx.globalAlpha = 0.35;
     ctx.lineWidth = shape.size * 5;
   } else {
-    ctx.globalAlpha = alphaScale;
+    ctx.globalAlpha = 1;
     ctx.lineWidth = shape.size;
   }
 
@@ -185,10 +180,10 @@ export function OverlayView() {
   const activeDisplayIdRef = useRef<number | null>(activeDisplayId);
   activeDisplayIdRef.current = activeDisplayId;
 
-  // Vanishing ink (`G`). While ON, a finished stroke is not committed to the
-  // model/history — it joins the ephemeral list and fades out on its own. State
-  // for publishing to the toolbar; mirrored to a ref for the once-bound pointer
-  // handler. Sticky across re-activation.
+  // Session ink (`G`). While ON, a finished stroke is not committed to the
+  // model/history — it joins the ephemeral list and stays on screen at full
+  // opacity until cleared. State for publishing to the toolbar; mirrored to a ref
+  // for the once-bound pointer handler. Sticky across re-activation.
   const [vanishing, setVanishing] = useState(false);
   const vanishingRef = useRef(vanishing);
   vanishingRef.current = vanishing;
@@ -201,16 +196,15 @@ export function OverlayView() {
   colorRef.current = color;
   sizeRef.current = size;
 
-  // Finished ephemeral shapes, held in a ref (never state) so the stable
-  // `redraw` and the long-lived rAF tick always read the live list. A single
-  // rAF loop (tracked in `rafRef`) runs only while the list is non-empty.
-  const ephemeralsRef = useRef<readonly Ephemeral[]>([]);
-  const rafRef = useRef<number | null>(null);
+  // Finished session-ink shapes, held in a ref (never state) so the stable
+  // `redraw` always reads the live list. They persist at full opacity until
+  // cleared — no fade, no timer, no rAF loop.
+  const ephemeralsRef = useRef<readonly Shape[]>([]);
 
-  // Mirror of "are there any fading vanishing strokes on screen?" as state, so
-  // the toolbar's Clear button can enable on ephemerals alone (they never enter
-  // the model/history). Kept in sync at the three ephemeral-list transitions
-  // below; the ref stays the source of truth for rendering.
+  // Mirror of "are there any session-ink strokes on screen?" as state, so the
+  // toolbar's Clear button can enable on ephemerals alone (they never enter the
+  // model/history). Kept in sync at the two ephemeral-list transitions below; the
+  // ref stays the source of truth for rendering.
   const [hasEphemerals, setHasEphemerals] = useState(false);
 
   // Committed shapes are rasterized once into this offscreen layer and
@@ -255,15 +249,10 @@ export function OverlayView() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(layer.canvas, 0, 0);
     ctx.restore();
-    // Vanishing-ink shapes render on top of the committed layer, dimming with
-    // age. Paint (never prune) here: an expired one draws at alpha 0 until the
-    // rAF tick removes it.
-    const ephemerals = ephemeralsRef.current;
-    if (ephemerals.length > 0) {
-      const now = performance.now();
-      for (const e of ephemerals) {
-        drawShape(ctx, e.shape, ephemeralAlpha(now - e.createdAt));
-      }
+    // Session-ink shapes render on top of the committed layer at full opacity,
+    // persisting until cleared.
+    for (const shape of ephemeralsRef.current) {
+      drawShape(ctx, shape);
     }
     if (model.current) {
       drawShape(ctx, model.current);
@@ -307,35 +296,14 @@ export function OverlayView() {
     [redraw],
   );
 
-  // Cancel the fade loop and forget any in-flight ephemerals. Used when clearing
-  // and when drawing mode deactivates — never on a plain vanishing-ink toggle.
-  // Repaints so a still-opaque ephemeral doesn't linger on the retained bitmap
-  // (the deactivate path has no other redraw; the clear path repaints anyway).
+  // Forget any session-ink strokes and repaint. Used when clearing and when
+  // drawing mode deactivates — never on a plain session-ink toggle. The repaint
+  // wipes them off the retained bitmap (the deactivate path has no other redraw;
+  // the clear path repaints anyway).
   const clearEphemerals = useCallback(() => {
     ephemeralsRef.current = [];
     setHasEphemerals(false);
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
     redraw();
-  }, [redraw]);
-
-  // Drive the fade: prune expired ephemerals, repaint, and keep animating only
-  // while any remain. No-ops if a loop is already running (single loop).
-  const startEphemeralLoop = useCallback(() => {
-    if (rafRef.current !== null) return;
-    const tick = () => {
-      ephemeralsRef.current = pruneEphemerals(ephemeralsRef.current, performance.now());
-      redraw();
-      if (ephemeralsRef.current.length > 0) {
-        rafRef.current = requestAnimationFrame(tick);
-      } else {
-        rafRef.current = null;
-        setHasEphemerals(false);
-      }
-    };
-    rafRef.current = requestAnimationFrame(tick);
   }, [redraw]);
 
   const setupCanvas = useCallback(() => {
@@ -375,13 +343,13 @@ export function OverlayView() {
   }, [applyModel]);
 
   const clearAll = useCallback(() => {
-    // Clear means clear: committed shapes and any fading vanishing ink both go.
+    // Clear means clear: committed shapes and any session ink both go.
     clearEphemerals();
     applyModel(modelClearAll(modelRef.current));
   }, [applyModel, clearEphemerals]);
 
   const toggleVanishing = useCallback(() => {
-    // Toggling only flips the mode; in-flight ephemerals keep fading either way.
+    // Toggling only flips the mode; existing session-ink strokes stay on screen.
     setVanishing((v) => !v);
   }, []);
 
@@ -463,9 +431,9 @@ export function OverlayView() {
     return () => unsub?.();
   }, []);
 
-  // Deactivating drops any in-flight vanishing ink from the prior session. (The
-  // toolbar's session-hidden reset now lives in main, which re-shows the toolbar
-  // window on re-activation.)
+  // Deactivating drops any session ink from the prior session. (The toolbar's
+  // session-hidden reset now lives in main, which re-shows the toolbar window on
+  // re-activation.)
   useEffect(() => {
     const unsub = window.screenDraw.ipc.on("overlay:active-changed", (params) => {
       if (!(params as { active?: boolean } | undefined)?.active) clearEphemerals();
@@ -661,16 +629,12 @@ export function OverlayView() {
       if (!drawingRef.current) return;
       drawingRef.current = false;
       if (vanishingRef.current && model.current) {
-        // Vanishing ink: the finished shape never enters the model/history — it
-        // becomes an ephemeral that fades and is pruned by the rAF loop.
-        ephemeralsRef.current = addEphemeral(
-          ephemeralsRef.current,
-          model.current,
-          performance.now(),
-        );
+        // Session ink: the finished shape never enters the model/history — it
+        // joins the ephemeral list and stays on screen until cleared.
+        ephemeralsRef.current = [...ephemeralsRef.current, model.current];
         setHasEphemerals(true);
+        // applyModel repaints; the ephemeral is already in the ref, so it shows.
         applyModel(discardCurrent(model));
-        startEphemeralLoop();
         return;
       }
       applyModel(commitShape(model));
@@ -748,7 +712,7 @@ export function OverlayView() {
         return;
       }
 
-      // G toggles vanishing ink.
+      // G toggles session ink.
       if (key === "g") {
         e.preventDefault();
         toggleVanishing();
@@ -800,8 +764,6 @@ export function OverlayView() {
       canvas.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("resize", setupCanvas);
-      // Stop the fade loop so it can't outlive the component.
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
   }, [
     setupCanvas,
@@ -812,7 +774,6 @@ export function OverlayView() {
     clearAll,
     selectThisDisplay,
     changeTool,
-    startEphemeralLoop,
     toggleVanishing,
   ]);
 

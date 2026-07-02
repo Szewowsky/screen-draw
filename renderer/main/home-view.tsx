@@ -89,7 +89,7 @@ const SHORTCUT_ROWS: { label: string; keys: ReactNode }[] = [
       </span>
     ),
   },
-  { label: "Vanishing ink", keys: <Key>G</Key> },
+  { label: "Session ink", keys: <Key>G</Key> },
   { label: "Hide/show toolbar", keys: <Key>T</Key> },
   {
     label: "Reset toolbar position",

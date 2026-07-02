@@ -28,16 +28,16 @@ Brush size: `[` / `]` or the toolbar slider (1–24 px).
 - **Custom colors**: click the color square in the toolbar to open the **color popover** — 15 presets, your recent colors, and a **hex input** (`#rrggbb` or `rrggbb`, also 3-digit). `Enter` applies; `Esc` or clicking elsewhere closes.
 - **Recent colors**: the last 4 custom colors persist across restarts and appear next to the palette in the toolbar and in the control panel's default-color picker.
 
-## Vanishing ink („duszek") — `G`
+## Session ink („duszek") — `G`
 
-Toggle with the ghost button in the toolbar or `G`. While on, everything you draw (any tool) stays on screen fully opaque for **2 seconds**, then fades out over **0.8 s** and disappears — no cleanup needed. Vanishing strokes never enter undo history; `C` (clear all) wipes them immediately along with committed shapes. Turning the mode off lets in-flight strokes finish fading. The toggle is remembered for the whole app session.
+Toggle with the ghost button in the toolbar or `G`. While on, everything you draw (any tool) stays on screen at full opacity for the whole drawing session — no auto-fade, no timer. Session-ink strokes never enter undo history (so `⌘Z` skips them); `C` (clear all) wipes them along with committed shapes, and they also vanish when you exit drawing mode. Turning the mode off leaves existing session ink on screen; new strokes just commit normally again. The toggle is remembered for the whole app session.
 
-Made for live streams and tutorials: point at things while talking, and the screen cleans itself.
+Made for live streams and tutorials: sketch quick throwaway marks that persist while you talk, then clear the lot with `C` when you're done — without cluttering undo history.
 
 ## Undo / redo / clear
 
 - **⌘Z** undo, **⌘⇧Z** redo — work globally while drawing (registered as system-wide shortcuts). Moves, deletes, and clear-all are undoable; history holds the last 100 operations per display.
-- **`C`** clears the active display's canvas (undoable; also wipes vanishing ink).
+- **`C`** clears the active display's canvas (undoable; also wipes session ink).
 
 ## Escape layering
 

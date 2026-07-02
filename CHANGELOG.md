@@ -2,6 +2,11 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
+## [Unreleased]
+
+### Changed
+- **Session ink** (`G`, formerly "vanishing ink"): ghost strokes now stay on screen at full opacity for the whole drawing session instead of fading out ~2 s after being drawn. They still stay out of undo history and are wiped by `C` (clear all) and when drawing mode ends. Better for tutorials, where a stroke used to disappear while you drew the next one.
+
 ## 1.3.0 — 2026-07-02
 
 ### Added

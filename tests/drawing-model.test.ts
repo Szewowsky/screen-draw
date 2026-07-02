@@ -241,7 +241,7 @@ describe("committed-layer invalidation (revision)", () => {
   });
 });
 
-describe("discardCurrent (vanishing ink)", () => {
+describe("discardCurrent (session ink)", () => {
   it("drops the in-progress shape without committing it or touching history", () => {
     let model = startShape(createModel(), PEN, { x: 1, y: 2 });
     model = updateShape(model, { x: 3, y: 4 }, false);

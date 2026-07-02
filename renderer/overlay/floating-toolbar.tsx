@@ -324,12 +324,12 @@ export function FloatingToolbar({
             }
             aria-pressed={vanishing}
             onClick={onVanishingToggle}
-            aria-label="Vanishing ink"
+            aria-label="Session ink"
           >
             <Ghost className="size-3.5" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent shortcut={["G"]}>Vanishing ink</TooltipContent>
+        <TooltipContent shortcut={["G"]}>Session ink</TooltipContent>
       </Tooltip>
 
       <Separator orientation="vertical" />

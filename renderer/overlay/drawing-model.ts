@@ -130,7 +130,7 @@ function pushHistory(
 }
 
 /**
- * Discard the in-progress shape without committing it. Used by vanishing ink,
+ * Discard the in-progress shape without committing it. Used by session ink,
  * which pulls the finished shape into its own ephemeral list rather than the
  * model. The committed set is untouched, so `revision` is left as-is (the cached
  * committed layer stays valid) and undo/redo never see the discarded shape.
