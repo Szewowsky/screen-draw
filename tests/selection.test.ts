@@ -12,6 +12,7 @@ import {
   endDrag,
   hitTest,
   redo,
+  restyleSelected,
   selectShape,
   startShape,
   translateShape,
@@ -277,5 +278,114 @@ describe("delete", () => {
     const model = modelWith([LINE]);
     expect(deleteSelected(model)).toBe(model);
     expect(canUndo(deleteSelected(createModel()))).toBe(false);
+  });
+});
+
+describe("restyleSelected", () => {
+  it("changes the selected shape's color, keeping selection and geometry", () => {
+    let model = selectShape(modelWith([LINE, RECT]), 0);
+    model = restyleSelected(model, { color: "#0A84FF" });
+    expect(model.shapes[0].color).toBe("#0A84FF");
+    expect(model.shapes[0].points).toEqual(LINE.points);
+    expect(model.shapes[1]).toEqual(RECT); // untouched
+    expect(model.selectedIndex).toBe(0);
+  });
+
+  it("changes the selected shape's size", () => {
+    let model = selectShape(modelWith([LINE]), 0);
+    model = restyleSelected(model, { size: 12 });
+    expect(model.shapes[0].size).toBe(12);
+    expect(model.selectedIndex).toBe(0);
+  });
+
+  it("changes color and size together in one operation", () => {
+    let model = selectShape(modelWith([LINE]), 0);
+    const undoDepth = model.undoStack.length;
+    model = restyleSelected(model, { color: "#30D158", size: 8 });
+    expect(model.shapes[0].color).toBe("#30D158");
+    expect(model.shapes[0].size).toBe(8);
+    expect(model.undoStack).toHaveLength(undoDepth + 1);
+  });
+
+  it("preserves the tool so a recolored highlighter stays a highlighter", () => {
+    const hl = shape("highlighter", LINE.points as Point[], 4);
+    let model = selectShape(modelWith([hl]), 0);
+    model = restyleSelected(model, { color: "#FFD60A", size: 9 });
+    expect(model.shapes[0].tool).toBe("highlighter");
+    expect(model.shapes[0].color).toBe("#FFD60A");
+    expect(model.shapes[0].size).toBe(9);
+  });
+
+  it("is a no-op (same reference) without a selection", () => {
+    const model = modelWith([LINE]);
+    expect(restyleSelected(model, { color: "#0A84FF" })).toBe(model);
+  });
+
+  it("is a no-op (same reference) mid-drag", () => {
+    let model = selectShape(modelWith([LINE]), 0);
+    model = beginDrag(model, { x: 0, y: 0 });
+    expect(restyleSelected(model, { color: "#0A84FF" })).toBe(model);
+  });
+
+  it("is a no-op (same reference) when the values are unchanged", () => {
+    const model = selectShape(modelWith([LINE]), 0);
+    const same = restyleSelected(model, { color: LINE.color, size: LINE.size });
+    expect(same).toBe(model);
+  });
+
+  it("is undoable and redoable, restoring the prior style round-trip", () => {
+    let model = selectShape(modelWith([LINE]), 0);
+    model = restyleSelected(model, { color: "#0A84FF", size: 10 });
+    expect(model.shapes[0].color).toBe("#0A84FF");
+
+    model = undo(model);
+    expect(model.shapes[0].color).toBe(LINE.color);
+    expect(model.shapes[0].size).toBe(LINE.size);
+
+    model = redo(model);
+    expect(model.shapes[0].color).toBe("#0A84FF");
+    expect(model.shapes[0].size).toBe(10);
+  });
+
+  it("clears the redo stack on a new restyle", () => {
+    let model = selectShape(modelWith([LINE, RECT]), 0);
+    model = undo(model); // there's a redo available now
+    expect(canRedo(model)).toBe(true);
+    model = selectShape(model, 0);
+    model = restyleSelected(model, { color: "#0A84FF" });
+    expect(canRedo(model)).toBe(false);
+  });
+
+  it("coalesces a burst of same-field size changes into one undo entry", () => {
+    let model = selectShape(modelWith([LINE]), 0);
+    const undoDepth = model.undoStack.length;
+    for (const s of [6, 7, 8, 9, 10]) {
+      model = restyleSelected(model, { size: s }, { coalesce: true });
+    }
+    expect(model.shapes[0].size).toBe(10);
+    expect(model.undoStack).toHaveLength(undoDepth + 1);
+    // One undo returns to the pre-gesture size, not an intermediate value.
+    model = undo(model);
+    expect(model.shapes[0].size).toBe(LINE.size);
+  });
+
+  it("records separate entries for discrete (non-coalesced) changes", () => {
+    let model = selectShape(modelWith([LINE]), 0);
+    const undoDepth = model.undoStack.length;
+    model = restyleSelected(model, { color: "#0A84FF" });
+    model = restyleSelected(model, { color: "#30D158" });
+    expect(model.undoStack).toHaveLength(undoDepth + 2);
+  });
+
+  it("does not merge a size change into a preceding color pick's entry", () => {
+    let model = selectShape(modelWith([LINE]), 0);
+    const undoDepth = model.undoStack.length;
+    model = restyleSelected(model, { color: "#0A84FF" }); // discrete
+    model = restyleSelected(model, { size: 10 }, { coalesce: true }); // different field
+    expect(model.undoStack).toHaveLength(undoDepth + 2);
+    // Undo peels off only the size change, leaving the recolor intact.
+    model = undo(model);
+    expect(model.shapes[0].size).toBe(LINE.size);
+    expect(model.shapes[0].color).toBe("#0A84FF");
   });
 });

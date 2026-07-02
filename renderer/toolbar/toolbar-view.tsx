@@ -41,6 +41,8 @@ interface ToolbarState {
   tool: OverlayTool;
   color: string;
   size: number;
+  /** Style of the selected shape, or null when nothing is selected. */
+  selectionStyle: { color: string; size: number } | null;
   recentColors: string[];
   canUndo: boolean;
   canRedo: boolean;
@@ -75,6 +77,12 @@ export function ToolbarView() {
   const [tool, setTool] = useState<OverlayTool>("pen");
   const [color, setColor] = useState(PALETTE[0].value);
   const [size, setSize] = useState(4);
+  // Style of the selected shape mirrored from the overlay, or null when nothing
+  // is selected. When set, the displayed color/size switch to it, while the
+  // `color`/`size` above stay as the untouched new-stroke defaults.
+  const [selectionStyle, setSelectionStyle] = useState<{ color: string; size: number } | null>(
+    null,
+  );
   const [recentColors, setRecentColors] = useState<string[]>([]);
   const [history, setHistory] = useState({
     canUndo: false,
@@ -173,6 +181,16 @@ export function ToolbarView() {
       if (typeof raw.tool === "string") setTool(raw.tool);
       if (typeof raw.color === "string") setColor(raw.color);
       if (typeof raw.size === "number") setSize(raw.size);
+      // `selectionStyle` is present in every published snapshot (object or null);
+      // apply it only when the key is present so seed/partial states don't reset it.
+      if ("selectionStyle" in raw) {
+        const s = raw.selectionStyle;
+        setSelectionStyle(
+          s && typeof s.color === "string" && typeof s.size === "number"
+            ? { color: s.color, size: s.size }
+            : null,
+        );
+      }
       if (Array.isArray(raw.recentColors)) setRecentColors(raw.recentColors);
       if (typeof raw.vanishing === "boolean") setVanishing(raw.vanishing);
       setHistory({
@@ -345,9 +363,12 @@ export function ToolbarView() {
             setTool(t);
             action({ type: "setTool", tool: t });
           }}
-          color={color}
+          color={selectionStyle ? selectionStyle.color : color}
           onColorChange={(c) => {
-            setColor(c);
+            // With a shape selected, the pick restyles it: update the mirrored
+            // selection style optimistically, not the new-stroke default.
+            if (selectionStyle) setSelectionStyle({ ...selectionStyle, color: c });
+            else setColor(c);
             action({ type: "setColor", color: c });
           }}
           onColorCommit={(c) => {
@@ -356,9 +377,10 @@ export function ToolbarView() {
           recentColors={recentColors}
           pickerOpen={pickerOpen}
           onPickerOpenChange={setPicker}
-          size={size}
+          size={selectionStyle ? selectionStyle.size : size}
           onSizeChange={(s) => {
-            setSize(s);
+            if (selectionStyle) setSelectionStyle({ ...selectionStyle, size: s });
+            else setSize(s);
             action({ type: "setSize", size: s });
           }}
           vanishing={vanishing}

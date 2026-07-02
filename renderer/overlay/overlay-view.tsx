@@ -23,6 +23,7 @@ import {
   getBounds,
   hitTest,
   redo as modelRedo,
+  restyleSelected,
   selectShape,
   startShape,
   undo as modelUndo,
@@ -168,6 +169,13 @@ export function OverlayView() {
   const [color, setColor] = useState(PALETTE[0].value);
   const [size, setSize] = useState(4);
   const [recentColors, setRecentColors] = useState<string[]>([]);
+  // Style (color/size) of the currently selected shape, or null when nothing is
+  // selected. Published to the toolbar so it mirrors the selection; kept
+  // separate from the `color`/`size` new-stroke defaults, which selection edits
+  // must not clobber. Derived from the model in `applyModel`.
+  const [selectionStyle, setSelectionStyle] = useState<{ color: string; size: number } | null>(
+    null,
+  );
   const [historyState, setHistoryState] = useState({
     canUndo: false,
     canRedo: false,
@@ -279,6 +287,14 @@ export function OverlayView() {
     (next: DrawingModel) => {
       modelRef.current = next;
       redraw();
+      // Mirror the selected shape's style to the toolbar (null when deselected).
+      const selected = next.selectedIndex !== null ? next.shapes[next.selectedIndex] : null;
+      setSelectionStyle((prev) => {
+        if (!selected) return prev === null ? prev : null;
+        return prev && prev.color === selected.color && prev.size === selected.size
+          ? prev
+          : { color: selected.color, size: selected.size };
+      });
       setHistoryState((prev) => {
         const canUndo = modelCanUndo(next);
         const canRedo = modelCanRedo(next);
@@ -467,6 +483,7 @@ export function OverlayView() {
       tool,
       color,
       size,
+      selectionStyle,
       recentColors,
       canUndo: historyState.canUndo,
       canRedo: historyState.canRedo,
@@ -478,6 +495,7 @@ export function OverlayView() {
     tool,
     color,
     size,
+    selectionStyle,
     recentColors,
     historyState,
     hasEphemerals,
@@ -524,13 +542,31 @@ export function OverlayView() {
           if (typeof action.tool === "string") changeTool(action.tool as OverlayTool);
           break;
         case "setColor":
-          if (typeof action.color === "string") setColor(action.color);
+          if (typeof action.color === "string") {
+            // With a shape selected, a color pick recolors it (a discrete pick,
+            // so no coalescing) instead of changing the new-stroke default.
+            if (modelRef.current.selectedIndex !== null) {
+              applyModel(restyleSelected(modelRef.current, { color: action.color }));
+            } else {
+              setColor(action.color);
+            }
+          }
           break;
         case "recentColor":
           if (typeof action.color === "string") recordRecentColor(action.color);
           break;
         case "setSize":
-          if (typeof action.size === "number") setSize(action.size);
+          if (typeof action.size === "number") {
+            // With a shape selected, the slider resizes it; coalesce the drag's
+            // burst of ticks into one undo entry. Otherwise set the default.
+            if (modelRef.current.selectedIndex !== null) {
+              applyModel(
+                restyleSelected(modelRef.current, { size: action.size }, { coalesce: true }),
+              );
+            } else {
+              setSize(action.size);
+            }
+          }
           break;
         case "undo":
           undo();
@@ -552,6 +588,7 @@ export function OverlayView() {
     return () => unsub();
   }, [
     isThisActiveDisplay,
+    applyModel,
     changeTool,
     recordRecentColor,
     undo,
@@ -728,11 +765,26 @@ export function OverlayView() {
       } else if (key === "[" || key === "]") {
         e.preventDefault();
         const delta = key === "]" ? 1 : -1;
-        setSize((s) => Math.min(MAX_SIZE, Math.max(MIN_SIZE, s + delta)));
+        const model = modelRef.current;
+        if (model.selectedIndex !== null) {
+          // Resize the selected shape. A key repeat is a burst too, so coalesce.
+          const current = model.shapes[model.selectedIndex].size;
+          const nextSize = Math.min(MAX_SIZE, Math.max(MIN_SIZE, current + delta));
+          applyModel(restyleSelected(model, { size: nextSize }, { coalesce: true }));
+        } else {
+          setSize((s) => Math.min(MAX_SIZE, Math.max(MIN_SIZE, s + delta)));
+        }
       } else if (/^[1-6]$/.test(e.key)) {
         e.preventDefault();
         const swatch = PALETTE[Number(e.key) - 1];
-        if (swatch) setColor(swatch.value);
+        if (swatch) {
+          // Recolor the selected shape (discrete pick), else set the default.
+          if (modelRef.current.selectedIndex !== null) {
+            applyModel(restyleSelected(modelRef.current, { color: swatch.value }));
+          } else {
+            setColor(swatch.value);
+          }
+        }
       }
     };
 

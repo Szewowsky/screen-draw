@@ -5,6 +5,7 @@ All notable changes to Screen Draw are documented here. Feature descriptions liv
 ## [Unreleased]
 
 ### Added
+- **Restyle the selected shape**: with a shape selected (`V`), the toolbar's color swatches/popover and size slider act on that shape instead of the new-stroke defaults — picking a color recolors it, moving the slider resizes it, both undoable. Selecting a shape mirrors its color and size in the toolbar; deselecting restores your drawing defaults (unchanged by the edits). A highlighter keeps its translucent band when recolored. A continuous slider drag collapses into a single undo entry.
 - **Toolbar toggle for "hidden in recordings"**: a new button on the floating toolbar shows the current content-protection state at a glance and lights up (accent) when the toolbar is hidden from screen recordings. Clicking it flips the setting; it stays in sync with `⇧R` and the Settings window.
 
 ## 1.2.0 — 2026-07-02

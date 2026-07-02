@@ -283,6 +283,88 @@ export function deleteSelected(model: DrawingModel): DrawingModel {
   };
 }
 
+/** A restyle changes the selected shape's color and/or size, leaving its geometry. */
+export interface ShapeStyle {
+  color?: string;
+  size?: number;
+}
+
+/**
+ * True when `a` and `b` are the same committed set except that the shape at
+ * `index` differs only in the single restyle field `field` (its other style
+ * fields, points, and tool are equal) and every other shape is reference-equal.
+ * Used to decide whether a coalescing restyle may merge into the undo top: it
+ * merges only for a continuous same-field gesture (e.g. a size-slider drag), so
+ * a size change that follows a color pick still records its own entry.
+ */
+function isSameFieldRestyle(
+  a: readonly Shape[],
+  b: readonly Shape[],
+  index: number,
+  field: "color" | "size",
+): boolean {
+  if (a.length !== b.length || index < 0 || index >= a.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (i === index) continue;
+    if (a[i] !== b[i]) return false;
+  }
+  const sa = a[index];
+  const sb = b[index];
+  const other = field === "color" ? "size" : "color";
+  return sa.tool === sb.tool && sa.points === sb.points && sa[other] === sb[other];
+}
+
+/**
+ * Replace the selected shape's color and/or size, keeping its geometry and
+ * selection. No-op (returns the same model) when nothing is selected, a drag is
+ * active, or the merged style equals the current shape. Undoable like any other
+ * operation: the previous committed set is pushed to the undo stack, redo is
+ * cleared, and the revision bumped.
+ *
+ * Coalescing (`options.coalesce`, default false): a slider drag emits many
+ * changes per second, which would flood the 100-entry history. With
+ * `coalesce: true` the change merges into the undo top *iff* that top is the
+ * baseline of a restyle of this same shape in the same single field (see
+ * {@link isSameFieldRestyle}) — so one continuous same-field gesture yields one
+ * undo entry, while a change in a different field (e.g. size after a color pick)
+ * still records its own entry. Discrete picks pass `coalesce: false` (the
+ * default) and always record. Consequence: two consecutive same-field gestures
+ * with nothing between them merge into one entry — acceptable within spec.
+ */
+export function restyleSelected(
+  model: DrawingModel,
+  style: ShapeStyle,
+  options: { coalesce?: boolean } = {},
+): DrawingModel {
+  if (model.drag || model.selectedIndex === null) return model;
+  const index = model.selectedIndex;
+  const shape = model.shapes[index];
+  const color = style.color ?? shape.color;
+  const size = style.size ?? shape.size;
+  if (color === shape.color && size === shape.size) return model;
+
+  const shapes = model.shapes.map((s, i) => (i === index ? { ...s, color, size } : s));
+
+  // Which single field is this restyle writing? Only a single-field change can
+  // coalesce; a both-fields change always records a fresh entry.
+  const field: "color" | "size" | null =
+    color !== shape.color && size !== shape.size ? null : color !== shape.color ? "color" : "size";
+  const top = model.undoStack[model.undoStack.length - 1];
+  const merge =
+    options.coalesce === true &&
+    field !== null &&
+    top !== undefined &&
+    isSameFieldRestyle(top, model.shapes, index, field);
+
+  return {
+    ...model,
+    shapes,
+    undoStack: merge ? model.undoStack : pushHistory(model.undoStack, model.shapes),
+    redoStack: [],
+    revision: model.revision + 1,
+  };
+}
+
 /** Move a shape by (dx, dy), translating every point. */
 export function translateShape(shape: Shape, dx: number, dy: number): Shape {
   if (dx === 0 && dy === 0) return shape;
