@@ -14,6 +14,29 @@ export const PALETTE: PaletteColor[] = [
   { name: "Purple", value: "#BF5AF2" },
 ];
 
+/**
+ * Curated high-contrast annotation colors for the overlay color popover's
+ * preset grid. Kept separate from PALETTE (the six toolbar quick-swatches):
+ * these are lowercase `#rrggbb` to match normalized picker output.
+ */
+export const COLOR_PRESETS: string[] = [
+  "#ffffff",
+  "#000000",
+  "#8e8e93",
+  "#ff3b30",
+  "#ff2d55",
+  "#ff9500",
+  "#ffd60a",
+  "#30d158",
+  "#00c7be",
+  "#64d2ff",
+  "#0a84ff",
+  "#5e5ce6",
+  "#bf5af2",
+  "#a2845e",
+  "#ac8e68",
+];
+
 export const MIN_SIZE = 1;
 export const MAX_SIZE = 24;
 

@@ -1,13 +1,15 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
+  type RefObject,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   Button,
-  ColorWell,
   SegmentedControl,
   SegmentedControlItem,
   Separator,
@@ -31,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  COLOR_PRESETS,
   MAX_SIZE,
   MIN_SIZE,
   PALETTE,
@@ -39,6 +42,7 @@ import {
   type ScreenDrawSettings,
   type ToolbarPosition,
 } from "./constants";
+import { normalizeHexColor } from "./color";
 import { clampToolbarPosition, sanitizeToolbarPosition } from "./toolbar-prefs";
 import {
   arrowHeadPoints,
@@ -197,6 +201,14 @@ export function OverlayView() {
   const [activeDisplayId, setActiveDisplayId] = useState<number | null>(displayIdRef.current);
   const activeDisplayIdRef = useRef<number | null>(activeDisplayId);
   activeDisplayIdRef.current = activeDisplayId;
+
+  // Whether the in-overlay color popover is open. Mirrored to a ref so the
+  // window-level keydown handler can let Escape close it before touching the
+  // selection/drawing state (the handler runs in bubble phase, so it must
+  // check this signal itself rather than rely on stopPropagation).
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerOpenRef = useRef(pickerOpen);
+  pickerOpenRef.current = pickerOpen;
 
   // Keep the latest tool settings available to the (stable) pointer handlers.
   const toolRef = useRef(tool);
@@ -500,6 +512,13 @@ export function OverlayView() {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        // The color popover owns Escape while open: close it without touching
+        // the selection or leaving drawing mode.
+        if (pickerOpenRef.current) {
+          e.preventDefault();
+          setPickerOpen(false);
+          return;
+        }
         e.preventDefault();
         // Escape cancels an in-progress move (shape snaps back), then drops
         // the selection; only a further press exits drawing mode.
@@ -523,6 +542,17 @@ export function OverlayView() {
       }
       // Plain single-key shortcuts (skip when a command/control/option modifier is held).
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      // Never fire tool shortcuts while typing in a text field (e.g. the color
+      // popover's hex input) — the keystrokes belong to the input.
+      const target = e.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        return;
+      }
 
       if (e.key === "Backspace" || e.key === "Delete") {
         if (modelRef.current.selectedIndex !== null) {
@@ -587,6 +617,8 @@ export function OverlayView() {
           onColorChange={setColor}
           onColorCommit={recordRecentColor}
           recentColors={recentColors}
+          pickerOpen={pickerOpen}
+          onPickerOpenChange={setPickerOpen}
           size={size}
           onSizeChange={setSize}
           pos={toolbarPos}
@@ -612,6 +644,8 @@ interface FloatingToolbarProps {
   onColorChange: (color: string) => void;
   onColorCommit: (color: string) => void;
   recentColors: string[];
+  pickerOpen: boolean;
+  onPickerOpenChange: (open: boolean) => void;
   size: number;
   onSizeChange: (size: number) => void;
   pos: ToolbarPosition | null;
@@ -633,6 +667,8 @@ function FloatingToolbar({
   onColorChange,
   onColorCommit,
   recentColors,
+  pickerOpen,
+  onPickerOpenChange,
   size,
   onSizeChange,
   pos,
@@ -675,6 +711,17 @@ function FloatingToolbar({
   };
 
   const customColors = recentColors.filter((c) => !isPaletteColor(c));
+
+  const swatchRef = useRef<HTMLButtonElement>(null);
+
+  const applyColor = useCallback(
+    (value: string) => {
+      onColorChange(value);
+      onColorCommit(value);
+      onPickerOpenChange(false);
+    },
+    [onColorChange, onColorCommit, onPickerOpenChange],
+  );
 
   return (
     <div
@@ -772,14 +819,30 @@ function FloatingToolbar({
         ))}
       </SegmentedControl>
 
-      <ColorWell
-        value={color}
-        onChange={onColorChange}
-        onCommit={onColorCommit}
-        size="small"
-        className="!size-7 !rounded-md"
-        aria-label="Custom color"
-      />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            ref={swatchRef}
+            type="button"
+            aria-label="Custom color"
+            aria-haspopup="dialog"
+            aria-expanded={pickerOpen}
+            onClick={() => onPickerOpenChange(!pickerOpen)}
+            className="no-drag size-7 shrink-0 rounded-md border border-white/15 shadow-inner"
+            style={{ backgroundColor: color }}
+          />
+        </TooltipTrigger>
+        <TooltipContent>Custom color</TooltipContent>
+      </Tooltip>
+      {pickerOpen ? (
+        <ColorPopover
+          anchorRef={swatchRef}
+          color={color}
+          recentColors={customColors}
+          onApply={applyColor}
+          onClose={() => onPickerOpenChange(false)}
+        />
+      ) : null}
 
       <Separator orientation="vertical" />
 
@@ -875,5 +938,154 @@ function FloatingToolbar({
         <TooltipContent shortcut={["Esc"]}>Stop drawing</TooltipContent>
       </Tooltip>
     </div>
+  );
+}
+
+interface ColorPopoverProps {
+  anchorRef: RefObject<HTMLButtonElement | null>;
+  color: string;
+  recentColors: string[];
+  onApply: (color: string) => void;
+  onClose: () => void;
+}
+
+/** Estimated popover size, used to place it before it has measured itself. */
+const POPOVER_WIDTH = 168;
+const POPOVER_HEIGHT = 200;
+const POPOVER_GAP = 8;
+const POPOVER_MARGIN = 8;
+
+/**
+ * In-window color picker rendered as plain DOM inside the overlay (the native
+ * macOS color panel would open behind the screen-saver-level overlay). Shows a
+ * preset grid, the recent-colors row, and a hex input. Positions itself above
+ * the anchoring swatch, flipping below when there is no room. Closes on outside
+ * click; Escape is handled by the overlay's window keydown listener.
+ */
+function ColorPopover({ anchorRef, color, recentColors, onApply, onClose }: ColorPopoverProps) {
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [hex, setHex] = useState("");
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+
+  // Place the popover relative to the swatch: above by default, below when the
+  // toolbar sits near the top edge; clamp horizontally into the viewport.
+  useLayoutEffect(() => {
+    const anchor = anchorRef.current;
+    if (!anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    const height = popoverRef.current?.offsetHeight ?? POPOVER_HEIGHT;
+    const width = popoverRef.current?.offsetWidth ?? POPOVER_WIDTH;
+    const above = rect.top - POPOVER_GAP - height;
+    const below = rect.bottom + POPOVER_GAP;
+    const top = above >= POPOVER_MARGIN ? above : below;
+    const centered = rect.left + rect.width / 2 - width / 2;
+    const maxLeft = window.innerWidth - width - POPOVER_MARGIN;
+    const left = Math.min(Math.max(POPOVER_MARGIN, centered), Math.max(POPOVER_MARGIN, maxLeft));
+    setPos({ left, top });
+  }, [anchorRef]);
+
+  // Close when clicking anywhere outside the popover (but not on the anchor,
+  // whose own click toggles the popover).
+  useEffect(() => {
+    const onPointerDown = (e: PointerEvent) => {
+      const node = e.target as Node;
+      if (popoverRef.current?.contains(node)) return;
+      if (anchorRef.current?.contains(node)) return;
+      onClose();
+    };
+    // Capture phase so the canvas's own pointerdown does not run first.
+    window.addEventListener("pointerdown", onPointerDown, true);
+    return () => window.removeEventListener("pointerdown", onPointerDown, true);
+  }, [anchorRef, onClose]);
+
+  const submitHex = () => {
+    const normalized = normalizeHexColor(hex);
+    if (normalized) onApply(normalized);
+  };
+
+  const normalizedHex = normalizeHexColor(hex);
+  const hexInvalid = hex.trim() !== "" && normalizedHex === null;
+
+  // Rendered through a portal to document.body: the toolbar div uses `transform`
+  // (default -translate-x-1/2) and `backdrop-filter`, both of which would make a
+  // `position: fixed` descendant resolve against the toolbar box instead of the
+  // viewport, throwing the popover off-screen.
+  return createPortal(
+    <div
+      ref={popoverRef}
+      role="dialog"
+      aria-label="Color picker"
+      className="no-drag fixed z-40 flex w-[168px] flex-col gap-2 rounded-[12px] border border-white/10 bg-[#1d1d1f]/95 p-2.5 shadow-[0_12px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl"
+      style={pos ? { left: pos.left, top: pos.top } : { left: -9999, top: -9999 }}
+    >
+      <div className="grid grid-cols-5 gap-1.5">
+        {COLOR_PRESETS.map((c) => {
+          const selected = c.toLowerCase() === color.toLowerCase();
+          return (
+            <button
+              key={c}
+              type="button"
+              aria-label={c}
+              onClick={() => onApply(c)}
+              className={
+                "size-6 rounded-md border shadow-inner " +
+                (selected ? "border-white ring-1 ring-white" : "border-white/15")
+              }
+              style={{ backgroundColor: c }}
+            />
+          );
+        })}
+      </div>
+
+      {recentColors.length > 0 ? (
+        <>
+          <Separator orientation="horizontal" />
+          <div className="flex flex-wrap gap-1.5">
+            {recentColors.map((c) => (
+              <button
+                key={c}
+                type="button"
+                aria-label={`Recent color ${c}`}
+                onClick={() => onApply(c)}
+                className="size-6 rounded-md border border-white/15 shadow-inner"
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      <Separator orientation="horizontal" />
+
+      <div className="flex items-center gap-1.5">
+        <span
+          className="size-6 shrink-0 rounded-md border border-white/15 shadow-inner"
+          style={{ backgroundColor: normalizedHex ?? color }}
+        />
+        <input
+          type="text"
+          value={hex}
+          spellCheck={false}
+          autoComplete="off"
+          placeholder="#rrggbb"
+          aria-label="Hex color"
+          aria-invalid={hexInvalid}
+          onChange={(e) => setHex(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            // Enter applies the hex value; Escape is left to bubble to the
+            // overlay's window keydown, which closes the popover.
+            if (e.key === "Enter") {
+              e.preventDefault();
+              submitHex();
+            }
+          }}
+          className={
+            "h-6 w-full min-w-0 rounded-md border bg-black/30 px-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-500 " +
+            (hexInvalid ? "border-red-500/70" : "border-white/15 focus:border-white/30")
+          }
+        />
+      </div>
+    </div>,
+    document.body,
   );
 }
