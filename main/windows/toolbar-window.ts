@@ -127,9 +127,11 @@ export function showToolbarWindow(activeDisplayId: number | null): void {
   if (lastBounds) {
     const wa = activeWorkArea(activeDisplayId);
     // lastBounds.x/y are absolute; recompute relative offset is unknown here, so
-    // the renderer re-measures on active-changed. Only clamp into the new area.
-    const x = Math.min(Math.max(wa.x, lastBounds.x), wa.x + wa.width - 1);
-    const y = Math.min(Math.max(wa.y, lastBounds.y), wa.y + wa.height - 1);
+    // the renderer re-measures on active-changed. Only clamp into the new area,
+    // accounting for the window size so a bottom-right-parked toolbar does not
+    // hang off the new display's edge (floor at the work-area origin).
+    const x = Math.max(wa.x, Math.min(lastBounds.x, wa.x + wa.width - lastBounds.width));
+    const y = Math.max(wa.y, Math.min(lastBounds.y, wa.y + wa.height - lastBounds.height));
     win.setBounds({ x, y, width: lastBounds.width, height: lastBounds.height });
   }
 }

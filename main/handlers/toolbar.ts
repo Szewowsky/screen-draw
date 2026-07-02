@@ -74,6 +74,15 @@ export function registerToolbarHandlers(): void {
       return;
     }
 
+    // Refocus-only: clicking the swatch or closing the popover (Escape, outside
+    // click, blur, deactivate) leaves keyboard focus on the toolbar window. This
+    // hands it back to the active overlay so its single-key shortcuts keep
+    // working, without relaying any drawing action.
+    if (type === "refocusOverlay") {
+      focusActiveOverlay();
+      return;
+    }
+
     // Everything else is a drawing action for the active overlay. Refocus the
     // active overlay first: clicking a toolbar button moves keyboard focus to
     // the toolbar window, which would otherwise starve the overlay's single-key

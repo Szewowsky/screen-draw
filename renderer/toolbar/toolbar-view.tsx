@@ -45,6 +45,7 @@ interface ToolbarState {
   canUndo: boolean;
   canRedo: boolean;
   hasShapes: boolean;
+  hasEphemerals: boolean;
   vanishing: boolean;
   toolbarPosition: { x: number; y: number } | null;
   workArea: WorkArea;
@@ -75,7 +76,12 @@ export function ToolbarView() {
   const [color, setColor] = useState(PALETTE[0].value);
   const [size, setSize] = useState(4);
   const [recentColors, setRecentColors] = useState<string[]>([]);
-  const [history, setHistory] = useState({ canUndo: false, canRedo: false, hasShapes: false });
+  const [history, setHistory] = useState({
+    canUndo: false,
+    canRedo: false,
+    hasShapes: false,
+    hasEphemerals: false,
+  });
   const [vanishing, setVanishing] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -89,6 +95,21 @@ export function ToolbarView() {
   const action = useCallback((payload: Record<string, unknown>) => {
     void window.screenDraw.ipc.invoke("toolbar:action", payload);
   }, []);
+
+  // Single choke point for the popover's open/close state. Whenever it closes,
+  // hand keyboard focus back to the active overlay: clicking the swatch focused
+  // the toolbar window, and closing the popover any other way (Escape, outside
+  // click, blur, deactivate) would otherwise strand focus on the toolbar,
+  // starving the overlay's single-key shortcuts. Applying a color already
+  // refocuses via the setColor action, but firing here too is harmless (main
+  // just re-focuses the already-active overlay).
+  const setPicker = useCallback(
+    (open: boolean) => {
+      setPickerOpen(open);
+      if (!open) action({ type: "refocusOverlay" });
+    },
+    [action],
+  );
 
   /**
    * Resolve the bar's display-relative top-left. A stored position is sanitized
@@ -157,6 +178,7 @@ export function ToolbarView() {
         canUndo: raw.canUndo === true,
         canRedo: raw.canRedo === true,
         hasShapes: raw.hasShapes === true,
+        hasEphemerals: raw.hasEphemerals === true,
       });
       // Work area / position may have changed (display switch); re-place.
       reportBounds();
@@ -225,16 +247,43 @@ export function ToolbarView() {
 
   // Close the popover on Escape (mirrors the overlay's behavior in its own
   // window); other keys are handled by the overlay, which holds drawing focus.
+  // Routes through setPicker so focus returns to the overlay on close.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && pickerOpenRef.current) {
         e.preventDefault();
-        setPickerOpen(false);
+        setPicker(false);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [setPicker]);
+
+  // The in-window outside-click close only sees clicks inside the toolbar
+  // window; a click on the overlay canvas (or another display) lands in a
+  // different window, so the toolbar window blurs instead. Close the popover on
+  // blur so its transparent reserve area stops swallowing draw clicks and the
+  // window shrinks back to the bar. Guarded on pickerOpenRef so ordinary
+  // toolbar-button blurs (each refocuses the overlay) don't fire spuriously.
+  useEffect(() => {
+    const onBlur = () => {
+      if (pickerOpenRef.current) setPicker(false);
+    };
+    window.addEventListener("blur", onBlur);
+    return () => window.removeEventListener("blur", onBlur);
+  }, [setPicker]);
+
+  // Deactivating drawing (or switching away) while the popover is open must not
+  // resurrect it — with its oversized reserve bounds — next session. The window
+  // is hidden, not destroyed, so close the popover when the overlay reports
+  // inactive, resetting both the picker state and the reserve-height bounds.
+  useEffect(() => {
+    const unsub = window.screenDraw.ipc.on("overlay:active-changed", (params) => {
+      const active = (params as { active?: boolean } | undefined)?.active;
+      if (active === false && pickerOpenRef.current) setPicker(false);
+    });
+    return () => unsub();
+  }, [setPicker]);
 
   // Grip drag: the bar's new screen top-left is `pointerScreen - grabOffset`
   // (grabOffset = where in the bar the pointer grabbed). Convert to
@@ -287,7 +336,7 @@ export function ToolbarView() {
           }}
           recentColors={recentColors}
           pickerOpen={pickerOpen}
-          onPickerOpenChange={setPickerOpen}
+          onPickerOpenChange={setPicker}
           size={size}
           onSizeChange={(s) => {
             setSize(s);
@@ -304,7 +353,7 @@ export function ToolbarView() {
           onUndo={() => action({ type: "undo" })}
           canRedo={history.canRedo}
           onRedo={() => action({ type: "redo" })}
-          canClear={history.hasShapes}
+          canClear={history.hasShapes || history.hasEphemerals}
           onClear={() => action({ type: "clear" })}
           onExit={() => action({ type: "exit" })}
         />

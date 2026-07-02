@@ -199,6 +199,12 @@ export function OverlayView() {
   const ephemeralsRef = useRef<readonly Ephemeral[]>([]);
   const rafRef = useRef<number | null>(null);
 
+  // Mirror of "are there any fading vanishing strokes on screen?" as state, so
+  // the toolbar's Clear button can enable on ephemerals alone (they never enter
+  // the model/history). Kept in sync at the three ephemeral-list transitions
+  // below; the ref stays the source of truth for rendering.
+  const [hasEphemerals, setHasEphemerals] = useState(false);
+
   // Committed shapes are rasterized once into this offscreen layer and
   // re-rasterized only when the committed set changes (model revision) or the
   // canvas is resized. Per pointer event only the bitmap is blitted and the
@@ -291,6 +297,7 @@ export function OverlayView() {
   // (the deactivate path has no other redraw; the clear path repaints anyway).
   const clearEphemerals = useCallback(() => {
     ephemeralsRef.current = [];
+    setHasEphemerals(false);
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
@@ -305,7 +312,12 @@ export function OverlayView() {
     const tick = () => {
       ephemeralsRef.current = pruneEphemerals(ephemeralsRef.current, performance.now());
       redraw();
-      rafRef.current = ephemeralsRef.current.length > 0 ? requestAnimationFrame(tick) : null;
+      if (ephemeralsRef.current.length > 0) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        rafRef.current = null;
+        setHasEphemerals(false);
+      }
     };
     rafRef.current = requestAnimationFrame(tick);
   }, [redraw]);
@@ -459,9 +471,19 @@ export function OverlayView() {
       canUndo: historyState.canUndo,
       canRedo: historyState.canRedo,
       hasShapes: historyState.hasShapes,
+      hasEphemerals,
       vanishing,
     });
-  }, [tool, color, size, recentColors, historyState, vanishing, isThisActiveDisplay]);
+  }, [
+    tool,
+    color,
+    size,
+    recentColors,
+    historyState,
+    hasEphemerals,
+    vanishing,
+    isThisActiveDisplay,
+  ]);
 
   useEffect(() => {
     publishState();
@@ -578,9 +600,12 @@ export function OverlayView() {
     const onPointerMove = (e: PointerEvent) => {
       // Hovering over a non-active display's overlay makes it the active display
       // (and focuses its window), so the first click is handled by a key window
-      // instead of being swallowed. The guard in selectThisDisplay prevents
-      // redundant IPC when this display is already active.
-      selectThisDisplay();
+      // instead of being swallowed. Only hover (no buttons pressed) may activate:
+      // a captured drag on display A that physically crosses onto display B still
+      // sends B raw pointermove events, and letting those hijack the active
+      // display mid-stroke would move focus/toolbar and misdirect ⌘Z. The guard
+      // in selectThisDisplay prevents redundant IPC when already active.
+      if (e.buttons === 0) selectThisDisplay();
       const model = modelRef.current;
       if (model.drag) {
         applyModel(updateDrag(model, toPoint(e)));
@@ -606,6 +631,7 @@ export function OverlayView() {
           model.current,
           performance.now(),
         );
+        setHasEphemerals(true);
         applyModel(discardCurrent(model));
         startEphemeralLoop();
         return;
@@ -662,14 +688,13 @@ export function OverlayView() {
 
       // Shift+R toggles hiding the toolbar in recordings. Handled before the
       // tool-key lookup so it isn't seen as R (Rectangle). Persists through
-      // settings; main re-applies content protection on the toolbar window.
+      // settings; main re-applies content protection on the toolbar window. The
+      // flip is atomic in main (no settings:get read-modify-write race here).
       if (key === "r" && e.shiftKey) {
         e.preventDefault();
-        void window.screenDraw.ipc.invoke<ScreenDrawSettings>("settings:get").then((settings) =>
-          window.screenDraw.ipc.invoke("settings:setDefaults", {
-            hideToolbarInRecordings: !settings.hideToolbarInRecordings,
-          }),
-        );
+        void window.screenDraw.ipc.invoke("settings:setDefaults", {
+          toggleHideToolbarInRecordings: true,
+        });
         return;
       }
 

@@ -72,6 +72,7 @@ export function registerOverlayHandlers(): void {
         toolbarPosition?: unknown;
         recentColor?: unknown;
         hideToolbarInRecordings?: unknown;
+        toggleHideToolbarInRecordings?: unknown;
       };
       const position = input.toolbarPosition as { x?: unknown; y?: unknown } | null | undefined;
       const next = setDefaults({
@@ -88,6 +89,7 @@ export function registerOverlayHandlers(): void {
           typeof input.hideToolbarInRecordings === "boolean"
             ? input.hideToolbarInRecordings
             : undefined,
+        toggleHideToolbarInRecordings: input.toggleHideToolbarInRecordings === true,
       });
       // Re-apply content protection to the toolbar window whenever the setting
       // may have changed (no-op if it did not).

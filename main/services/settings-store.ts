@@ -75,8 +75,15 @@ export function setDefaults(partial: {
   recentColor?: string;
   /** Toggle hiding the toolbar window from screen recordings; undefined leaves it unchanged. */
   hideToolbarInRecordings?: boolean;
+  /** Flip hideToolbarInRecordings atomically (read-modify-write happens here, not in the caller). */
+  toggleHideToolbarInRecordings?: boolean;
 }): ScreenDrawSettings {
   const current = getSettings();
+  const nextHideInRecordings = partial.toggleHideToolbarInRecordings
+    ? !current.hideToolbarInRecordings
+    : partial.hideToolbarInRecordings !== undefined
+      ? partial.hideToolbarInRecordings
+      : current.hideToolbarInRecordings;
   persist(
     coerceSettings({
       ...current,
@@ -87,10 +94,7 @@ export function setDefaults(partial: {
       recentColors: partial.recentColor
         ? addRecentColor(current.recentColors, partial.recentColor)
         : current.recentColors,
-      hideToolbarInRecordings:
-        partial.hideToolbarInRecordings !== undefined
-          ? partial.hideToolbarInRecordings
-          : current.hideToolbarInRecordings,
+      hideToolbarInRecordings: nextHideInRecordings,
     }),
   );
   return getSettings();
