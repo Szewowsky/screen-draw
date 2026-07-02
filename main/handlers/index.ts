@@ -11,6 +11,7 @@ import { appHandlers } from "./app.js";
 import { registerOverlayHandlers } from "./overlay.js";
 import { registerToolbarHandlers } from "./toolbar.js";
 import { getSettingsWindow, openSettingsWindow } from "../windows/settings-window.js";
+import { registerLatencyProbeHandlers } from "../services/latency-probe.js";
 
 import { ipcMain, nativeTheme } from "electron";
 import { logger } from "../logger.js";
@@ -59,6 +60,8 @@ export function registerHandlers(): void {
   registerOverlayHandlers();
   // Toolbar window ⇄ overlay bridge
   registerToolbarHandlers();
+  // Env-gated latency probe; registers nothing unless SCREEN_DRAW_LAT=1.
+  registerLatencyProbeHandlers();
 
   logger.info("handlers", "✓ IPC handlers registered");
 

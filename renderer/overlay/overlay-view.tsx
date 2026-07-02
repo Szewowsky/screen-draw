@@ -38,6 +38,8 @@ interface OverlayWindowState {
   active?: boolean;
   sticky?: boolean;
   activeDisplayId?: number | null;
+  latencyProbe?: boolean;
+  latencyActivationId?: string;
 }
 
 /**
@@ -85,6 +87,35 @@ function getOverlayDisplayId(): number | null {
 
 function normalizeDisplayId(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function markLatencyActivation(params: OverlayWindowState, displayId: number | null): void {
+  if (
+    params.active !== true ||
+    params.latencyProbe !== true ||
+    typeof params.latencyActivationId !== "string" ||
+    displayId === null ||
+    params.activeDisplayId !== displayId
+  ) {
+    return;
+  }
+
+  const receivedAt = performance.now();
+  const visibilityState = document.visibilityState;
+  requestAnimationFrame(() => {
+    const raf1At = performance.now();
+    requestAnimationFrame(() => {
+      const raf2At = performance.now();
+      window.screenDraw.ipc.send("perf:mark", {
+        latencyActivationId: params.latencyActivationId,
+        source: "overlay",
+        displayId,
+        visibilityState,
+        activeToRaf1Ms: raf1At - receivedAt,
+        activeToRaf2Ms: raf2At - receivedAt,
+      });
+    });
+  });
 }
 
 function drawArrowHead(ctx: CanvasRenderingContext2D, from: Point, to: Point, size: number) {
@@ -466,6 +497,7 @@ export function OverlayView() {
   useEffect(() => {
     const unsub = window.screenDraw.ipc.on("overlay:active-changed", (params) => {
       const p = (params as OverlayWindowState | undefined) ?? {};
+      markLatencyActivation(p, displayIdRef.current);
       activeRef.current = p.active === true;
       if (p.active) return;
       if (p.sticky) cancelInteraction();

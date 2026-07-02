@@ -20,11 +20,23 @@ import {
   showToolbarWindow,
 } from "./toolbar-window.js";
 import { nextMode, type OverlayMode } from "../services/overlay-mode.js";
+import {
+  beginLatencyActivation,
+  latencyActivationPayload,
+  markDeferredFocusScheduled,
+  measureLatencyStage,
+  measureLatencyStageAsync,
+  measureWindowOperation,
+  recordBrowserWindowFocus,
+  recordDeferredFocusFired,
+  updateLatencyActivation,
+} from "../services/latency-probe.js";
 import { logger } from "../logger.js";
 
 interface OverlayActivationOptions {
   displayId?: number;
   sourceWindow?: BrowserWindow | null;
+  triggerSource?: string;
 }
 
 const overlayWindows = new Map<number, BrowserWindow>();
@@ -60,7 +72,9 @@ function unregisterDrawingShortcuts(): void {
 
 function fitToDisplay(win: BrowserWindow, display: Display): void {
   const { bounds } = display;
-  win.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height });
+  measureWindowOperation("overlay", display.id, "setBounds", "overlaySetBoundsMs", () =>
+    win.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }),
+  );
 }
 
 function getDisplayById(displayId: number): Display | undefined {
@@ -152,54 +166,66 @@ async function createOverlayWindowForDisplay(display: Display): Promise<BrowserW
 }
 
 async function syncOverlayWindows(): Promise<BrowserWindow[]> {
-  ensureDisplayListeners();
+  return await measureLatencyStageAsync("syncOverlayWindowsMs", async () => {
+    ensureDisplayListeners();
 
-  const displays = screen.getAllDisplays();
-  const displayIds = new Set(displays.map((display) => display.id));
+    const displays = screen.getAllDisplays();
+    const displayIds = new Set(displays.map((display) => display.id));
 
-  for (const [displayId, win] of overlayWindows) {
-    if (!displayIds.has(displayId) && !win.isDestroyed()) {
-      win.close();
-    }
-  }
-
-  const windows = await Promise.all(
-    displays.map((display) => createOverlayWindowForDisplay(display)),
-  );
-
-  if (activeDisplayId !== null && !displayIds.has(activeDisplayId)) {
-    activeDisplayId = getDisplayIdForActivation();
-    broadcastActiveDisplay();
-  }
-
-  // Both drawing and sticky keep the overlay windows visible; only sticky makes
-  // them click-through. A new display appearing mid-session must come up in the
-  // right state (visible + ignoring mouse in sticky), so this mirrors the same
-  // per-mode logic used when entering the mode.
-  if (mode === "drawing" || mode === "sticky") {
-    const ignoreMouse = mode === "sticky";
-    for (const display of displays) {
-      const win = overlayWindows.get(display.id);
-      if (!win || win.isDestroyed()) continue;
-      fitToDisplay(win, display);
-      win.setIgnoreMouseEvents(ignoreMouse);
-      // In sticky the overlays never take focus (they must not steal it from the
-      // app the user is now working in), so every window shows inactive.
-      if (mode === "drawing" && display.id === activeDisplayId) {
-        win.show();
-      } else {
-        win.showInactive();
+    for (const [displayId, win] of overlayWindows) {
+      if (!displayIds.has(displayId) && !win.isDestroyed()) {
+        win.close();
       }
-      // macOS can re-constrain the frame while showing (nudging it below the
-      // menu bar); re-fit after show so the overlay covers the whole display.
-      fitToDisplay(win, display);
-      win.moveTop();
     }
-    // The toolbar only belongs to drawing mode; sticky hides it.
-    if (mode === "drawing") showToolbarWindow(activeDisplayId);
-  }
 
-  return windows;
+    const windows = await Promise.all(
+      displays.map((display) => createOverlayWindowForDisplay(display)),
+    );
+
+    if (activeDisplayId !== null && !displayIds.has(activeDisplayId)) {
+      activeDisplayId = getDisplayIdForActivation();
+      broadcastActiveDisplay();
+    }
+
+    // Both drawing and sticky keep the overlay windows visible; only sticky makes
+    // them click-through. A new display appearing mid-session must come up in the
+    // right state (visible + ignoring mouse in sticky), so this mirrors the same
+    // per-mode logic used when entering the mode.
+    if (mode === "drawing" || mode === "sticky") {
+      const ignoreMouse = mode === "sticky";
+      for (const display of displays) {
+        const win = overlayWindows.get(display.id);
+        if (!win || win.isDestroyed()) continue;
+        fitToDisplay(win, display);
+        win.setIgnoreMouseEvents(ignoreMouse);
+        // In sticky the overlays never take focus (they must not steal it from the
+        // app the user is now working in), so every window shows inactive.
+        if (mode === "drawing" && display.id === activeDisplayId) {
+          measureWindowOperation("overlay", display.id, "show", "overlayShowMs", () =>
+            win.show(),
+          );
+        } else {
+          measureWindowOperation(
+            "overlay",
+            display.id,
+            "showInactive",
+            "overlayShowInactiveMs",
+            () => win.showInactive(),
+          );
+        }
+        // macOS can re-constrain the frame while showing (nudging it below the
+        // menu bar); re-fit after show so the overlay covers the whole display.
+        fitToDisplay(win, display);
+        measureWindowOperation("overlay", display.id, "moveTop", "overlayMoveTopMs", () =>
+          win.moveTop(),
+        );
+      }
+      // The toolbar only belongs to drawing mode; sticky hides it.
+      if (mode === "drawing") showToolbarWindow(activeDisplayId);
+    }
+
+    return windows;
+  });
 }
 
 function ensureDisplayListeners(): void {
@@ -263,13 +289,18 @@ function cancelDeferredOverlayFocus(): void {
 
 function deferActiveOverlayFocus(): void {
   cancelDeferredOverlayFocus();
+  const scheduledAt = markDeferredFocusScheduled();
   deferredOverlayFocusTimer = setTimeout(() => {
     deferredOverlayFocusTimer = null;
+    recordDeferredFocusFired(scheduledAt);
     if (mode !== "drawing" || activeDisplayId === null) return;
     const win = overlayWindows.get(activeDisplayId);
     if (!win || win.isDestroyed()) return;
-    app.focus({ steal: true });
-    win.focus();
+    measureLatencyStage("appFocusCallMs", () => app.focus({ steal: true }));
+    measureWindowOperation("overlay", activeDisplayId, "focus", "overlayFocusMs", () =>
+      win.focus(),
+    );
+    recordBrowserWindowFocus(win);
   }, 16);
 }
 
@@ -304,41 +335,52 @@ export async function setOverlayActiveDisplay(displayId: number): Promise<void> 
 
 /** Enter interactive drawing: overlays visible + interactive, toolbar + shortcuts on. */
 async function enterDrawing(options: OverlayActivationOptions): Promise<void> {
-  activeDisplayId = getDisplayIdForActivation(options);
+  await measureLatencyStageAsync("enterDrawingMs", async () => {
+    activeDisplayId = getDisplayIdForActivation(options);
+    updateLatencyActivation({ activeDisplayId });
 
-  for (const [displayId, win] of overlayWindows) {
-    const display = getDisplayById(displayId);
-    if (!display || win.isDestroyed()) continue;
-    fitToDisplay(win, display);
-    win.setIgnoreMouseEvents(false);
-    if (displayId === activeDisplayId) {
-      win.show();
-    } else {
-      win.showInactive();
+    for (const [displayId, win] of overlayWindows) {
+      const display = getDisplayById(displayId);
+      if (!display || win.isDestroyed()) continue;
+      fitToDisplay(win, display);
+      win.setIgnoreMouseEvents(false);
+      if (displayId === activeDisplayId) {
+        measureWindowOperation("overlay", displayId, "show", "overlayShowMs", () => win.show());
+      } else {
+        measureWindowOperation(
+          "overlay",
+          displayId,
+          "showInactive",
+          "overlayShowInactiveMs",
+          () => win.showInactive(),
+        );
+      }
+      // macOS can re-constrain the frame while showing (nudging it below the
+      // menu bar); re-fit after show so the overlay covers the whole display.
+      fitToDisplay(win, display);
+      measureWindowOperation("overlay", displayId, "moveTop", "overlayMoveTopMs", () =>
+        win.moveTop(),
+      );
     }
-    // macOS can re-constrain the frame while showing (nudging it below the
-    // menu bar); re-fit after show so the overlay covers the whole display.
-    fitToDisplay(win, display);
-    win.moveTop();
-  }
 
-  // Re-entering drawing mode always reveals the toolbar (the `T` toggle is
-  // session-only). Raise it after the overlays so it stays clickable above
-  // them (same screen-saver level). Show it before focusing the app so the
-  // first visible activation cue is not gated on macOS app activation.
-  resetToolbarHidden();
-  showToolbarWindow(activeDisplayId);
+    // Re-entering drawing mode always reveals the toolbar (the `T` toggle is
+    // session-only). Raise it after the overlays so it stays clickable above
+    // them (same screen-saver level). Show it before focusing the app so the
+    // first visible activation cue is not gated on macOS app activation.
+    resetToolbarHidden();
+    showToolbarWindow(activeDisplayId);
 
-  // The overlay is usually toggled via a global shortcut while another app is
-  // frontmost. Without activating our app, macOS keeps keyboard focus on that
-  // app — clicks still register (acceptFirstMouse) but keydown shortcuts don't
-  // reach the overlay. Defer stealing focus by one frame so the visible toolbar
-  // is not gated on macOS app activation while switching between apps.
-  await registerDrawingShortcuts();
-  deferActiveOverlayFocus();
+    // The overlay is usually toggled via a global shortcut while another app is
+    // frontmost. Without activating our app, macOS keeps keyboard focus on that
+    // app — clicks still register (acceptFirstMouse) but keydown shortcuts don't
+    // reach the overlay. Defer stealing focus by one frame so the visible toolbar
+    // is not gated on macOS app activation while switching between apps.
+    await registerDrawingShortcuts();
+    deferActiveOverlayFocus();
 
-  // Keep keyboard focus on the active overlay: showing the toolbar must not
-  // steal the focus that the overlay's single-key shortcuts depend on.
+    // Keep keyboard focus on the active overlay: showing the toolbar must not
+    // steal the focus that the overlay's single-key shortcuts depend on.
+  });
 }
 
 /**
@@ -381,24 +423,31 @@ function enterHidden(): void {
 
 /** Apply a target mode: run the matching side effects and broadcast the change. */
 async function applyMode(next: OverlayMode, options: OverlayActivationOptions = {}): Promise<void> {
-  // Set the mode BEFORE syncing so syncOverlayWindows runs the target mode's
-  // window block (e.g. a pin doesn't first run the drawing show-block — toolbar
-  // up, overlay focused — only for enterSticky to immediately reverse it).
-  mode = next;
+  if (next === "drawing") {
+    beginLatencyActivation(options.triggerSource ?? "direct", { fromMode: mode, toMode: next });
+  }
 
-  await syncOverlayWindows();
+  await measureLatencyStageAsync("applyModeMs", async () => {
+    // Set the mode BEFORE syncing so syncOverlayWindows runs the target mode's
+    // window block (e.g. a pin doesn't first run the drawing show-block — toolbar
+    // up, overlay focused — only for enterSticky to immediately reverse it).
+    mode = next;
 
-  if (next === "drawing") await enterDrawing(options);
-  else if (next === "sticky") enterSticky();
-  else enterHidden();
+    await syncOverlayWindows();
 
-  broadcast("overlay:active-changed", {
-    active: mode === "drawing",
-    sticky: mode === "sticky",
-    activeDisplayId,
+    if (next === "drawing") await enterDrawing(options);
+    else if (next === "sticky") enterSticky();
+    else enterHidden();
+
+    broadcast("overlay:active-changed", {
+      active: mode === "drawing",
+      sticky: mode === "sticky",
+      activeDisplayId,
+      ...latencyActivationPayload(),
+    });
+    broadcastActiveDisplay();
+    logger.info("overlay", `Drawing overlay mode → ${mode}`);
   });
-  broadcastActiveDisplay();
-  logger.info("overlay", `Drawing overlay mode → ${mode}`);
 }
 
 export async function setOverlayActive(

@@ -20,6 +20,7 @@
 import { BrowserWindow, screen, type Display } from "electron";
 import { getPreloadPath, getWindowUrl } from "./window-paths.js";
 import { getSettings } from "../services/settings-store.js";
+import { measureLatencyStage, measureWindowOperation } from "../services/latency-probe.js";
 import { logger } from "../logger.js";
 
 let toolbarWindow: BrowserWindow | null = null;
@@ -113,33 +114,44 @@ export function setToolbarBounds(
   const x = Math.round(wa.x + request.x);
   const y = Math.round(wa.y + request.y);
   lastBounds = { width, height, x, y };
-  win.setBounds({ x, y, width, height });
+  measureWindowOperation("toolbar", activeDisplayId, "setBounds", "toolbarSetBoundsMs", () =>
+    win.setBounds({ x, y, width, height }),
+  );
 }
 
 /** Whether the toolbar should currently be visible (drawing on and not user-hidden). */
 export function showToolbarWindow(activeDisplayId: number | null): void {
-  const win = toolbarWindow;
-  if (!win || win.isDestroyed()) return;
-  if (userHidden) {
-    win.hide();
-    return;
-  }
-  win.showInactive();
-  // Same screen-saver level as the overlays, which call moveTop on show; raise
-  // the toolbar afterwards so it stays clickable above them.
-  win.moveTop();
-  // Re-apply the last known bounds so an active-display move lands the toolbar in
-  // the new display's work area even before the renderer re-measures.
-  if (lastBounds) {
-    const wa = activeWorkArea(activeDisplayId);
-    // lastBounds.x/y are absolute; recompute relative offset is unknown here, so
-    // the renderer re-measures on active-changed. Only clamp into the new area,
-    // accounting for the window size so a bottom-right-parked toolbar does not
-    // hang off the new display's edge (floor at the work-area origin).
-    const x = Math.max(wa.x, Math.min(lastBounds.x, wa.x + wa.width - lastBounds.width));
-    const y = Math.max(wa.y, Math.min(lastBounds.y, wa.y + wa.height - lastBounds.height));
-    win.setBounds({ x, y, width: lastBounds.width, height: lastBounds.height });
-  }
+  measureLatencyStage("showToolbarWindowMs", () => {
+    const win = toolbarWindow;
+    if (!win || win.isDestroyed()) return;
+    if (userHidden) {
+      win.hide();
+      return;
+    }
+    measureWindowOperation("toolbar", activeDisplayId, "showInactive", "toolbarShowInactiveMs", () =>
+      win.showInactive(),
+    );
+    // Same screen-saver level as the overlays, which call moveTop on show; raise
+    // the toolbar afterwards so it stays clickable above them.
+    measureWindowOperation("toolbar", activeDisplayId, "moveTop", "toolbarMoveTopMs", () =>
+      win.moveTop(),
+    );
+    // Re-apply the last known bounds so an active-display move lands the toolbar in
+    // the new display's work area even before the renderer re-measures.
+    const bounds = lastBounds;
+    if (bounds) {
+      const wa = activeWorkArea(activeDisplayId);
+      // lastBounds.x/y are absolute; recompute relative offset is unknown here, so
+      // the renderer re-measures on active-changed. Only clamp into the new area,
+      // accounting for the window size so a bottom-right-parked toolbar does not
+      // hang off the new display's edge (floor at the work-area origin).
+      const x = Math.max(wa.x, Math.min(bounds.x, wa.x + wa.width - bounds.width));
+      const y = Math.max(wa.y, Math.min(bounds.y, wa.y + wa.height - bounds.height));
+      measureWindowOperation("toolbar", activeDisplayId, "setBounds", "toolbarSetBoundsMs", () =>
+        win.setBounds({ x, y, width: bounds.width, height: bounds.height }),
+      );
+    }
+  });
 }
 
 export function hideToolbarWindow(): void {

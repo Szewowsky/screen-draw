@@ -25,7 +25,7 @@ export async function registerToggleShortcut(accelerator: string): Promise<boole
   let ok = false;
   try {
     ok = await globalShortcut.register(accelerator, () => {
-      void toggleOverlay();
+      void toggleOverlay({ triggerSource: "globalShortcut" });
     });
 
     if (ok) {

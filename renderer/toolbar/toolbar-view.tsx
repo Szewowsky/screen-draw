@@ -52,6 +52,12 @@ interface ToolbarState {
   workArea: WorkArea;
 }
 
+interface OverlayActiveChanged {
+  active?: boolean;
+  latencyProbe?: boolean;
+  latencyActivationId?: string;
+}
+
 /** Default bottom offset of the toolbar from the work-area bottom (matches 1.1). */
 const DEFAULT_BOTTOM_OFFSET = 88;
 
@@ -72,6 +78,33 @@ const FALLBACK_WORK_AREA: WorkArea = { x: 0, y: 0, width: 1440, height: 900 };
 
 function isToolbarState(value: unknown): value is Partial<ToolbarState> {
   return typeof value === "object" && value !== null;
+}
+
+function markLatencyActivation(params: OverlayActiveChanged): void {
+  if (
+    params.active !== true ||
+    params.latencyProbe !== true ||
+    typeof params.latencyActivationId !== "string"
+  ) {
+    return;
+  }
+
+  const receivedAt = performance.now();
+  const visibilityState = document.visibilityState;
+  requestAnimationFrame(() => {
+    const raf1At = performance.now();
+    requestAnimationFrame(() => {
+      const raf2At = performance.now();
+      window.screenDraw.ipc.send("perf:mark", {
+        latencyActivationId: params.latencyActivationId,
+        source: "toolbar",
+        displayId: null,
+        visibilityState,
+        activeToRaf1Ms: raf1At - receivedAt,
+        activeToRaf2Ms: raf2At - receivedAt,
+      });
+    });
+  });
 }
 
 export function ToolbarView() {
@@ -327,6 +360,7 @@ export function ToolbarView() {
   // inactive, resetting both the picker state and the reserve-height bounds.
   useEffect(() => {
     const unsub = window.screenDraw.ipc.on("overlay:active-changed", (params) => {
+      markLatencyActivation((params as OverlayActiveChanged | undefined) ?? {});
       const active = (params as { active?: boolean } | undefined)?.active;
       if (active === false && pickerOpenRef.current) setPicker(false);
     });

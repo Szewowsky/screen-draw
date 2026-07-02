@@ -40,7 +40,10 @@ export function registerOverlayHandlers(): void {
     if (typeof active !== "boolean") {
       throw new Error("overlay:setActive expects a boolean");
     }
-    await setOverlayActive(active, { sourceWindow: BrowserWindow.fromWebContents(event.sender) });
+    await setOverlayActive(active, {
+      sourceWindow: BrowserWindow.fromWebContents(event.sender),
+      triggerSource: "ipc:overlay:setActive",
+    });
     return overlayState();
   });
 

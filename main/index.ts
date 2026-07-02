@@ -177,7 +177,7 @@ function setupTray() {
     {
       label: "Toggle Drawing",
       click: () => {
-        toggleOverlay().catch((error) =>
+        toggleOverlay({ triggerSource: "tray" }).catch((error) =>
           logger.error("main", "Failed to toggle overlay from tray", error),
         );
       },
