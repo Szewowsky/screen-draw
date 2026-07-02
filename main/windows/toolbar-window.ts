@@ -69,7 +69,10 @@ export async function createToolbarWindow(): Promise<BrowserWindow> {
   });
 
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  win.setAlwaysOnTop(true, "screen-saver");
+  // One sublevel ABOVE the overlays (same base level): focusing or moveTop-ing
+  // an overlay reorders windows only within its own level, so the toolbar can
+  // never sink underneath and stop receiving clicks.
+  win.setAlwaysOnTop(true, "screen-saver", 1);
 
   win.on("closed", () => {
     toolbarWindow = null;
