@@ -2,7 +2,7 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
-## [Unreleased]
+## 1.3.0 — 2026-07-02
 
 ### Added
 - **Restyle the selected shape**: with a shape selected (`V`), the toolbar's color swatches/popover and size slider act on that shape instead of the new-stroke defaults — picking a color recolors it, moving the slider resizes it, both undoable. Selecting a shape mirrors its color and size in the toolbar; deselecting restores your drawing defaults (unchanged by the edits). A highlighter keeps its translucent band when recolored. A continuous slider drag collapses into a single undo entry.
