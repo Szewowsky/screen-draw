@@ -100,6 +100,15 @@ const SHORTCUT_ROWS: { label: string; keys: ReactNode }[] = [
       </KeyGroup>
     ),
   },
+  {
+    label: "Toolbar hidden in recordings",
+    keys: (
+      <KeyGroup>
+        <Key>⇧</Key>
+        <Key>R</Key>
+      </KeyGroup>
+    ),
+  },
   { label: "Deselect / stop drawing", keys: <Key>Esc</Key> },
 ];
 

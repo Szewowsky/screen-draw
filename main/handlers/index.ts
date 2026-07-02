@@ -9,6 +9,7 @@ import { fileURLToPath } from "url";
 
 import { appHandlers } from "./app.js";
 import { registerOverlayHandlers } from "./overlay.js";
+import { registerToolbarHandlers } from "./toolbar.js";
 import { getSettingsWindow, openSettingsWindow } from "../windows/settings-window.js";
 
 import { ipcMain, nativeTheme } from "electron";
@@ -56,6 +57,8 @@ export function registerHandlers(): void {
 
   // Drawing overlay + settings handlers
   registerOverlayHandlers();
+  // Toolbar window ⇄ overlay bridge
+  registerToolbarHandlers();
 
   logger.info("handlers", "✓ IPC handlers registered");
 

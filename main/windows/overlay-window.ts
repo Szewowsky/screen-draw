@@ -13,6 +13,12 @@
 import { app, BrowserWindow, globalShortcut, screen, type Display } from "electron";
 import { broadcast } from "../services/events.js";
 import { getPreloadPath, getWindowUrl } from "./window-paths.js";
+import {
+  createToolbarWindow,
+  hideToolbarWindow,
+  resetToolbarHidden,
+  showToolbarWindow,
+} from "./toolbar-window.js";
 import { logger } from "../logger.js";
 
 interface OverlayActivationOptions {
@@ -172,6 +178,8 @@ async function syncOverlayWindows(): Promise<BrowserWindow[]> {
       fitToDisplay(win, display);
       win.moveTop();
     }
+    // Keep the toolbar above the re-shown overlays (same screen-saver level).
+    showToolbarWindow(activeDisplayId);
   }
 
   return windows;
@@ -194,6 +202,9 @@ function ensureDisplayListeners(): void {
 
 export async function createOverlayWindow(): Promise<BrowserWindow> {
   const windows = await syncOverlayWindows();
+  // Create the toolbar window AFTER the overlays so it can sit above them at the
+  // shared screen-saver level (it is raised again on each show/active change).
+  await createToolbarWindow();
   const targetDisplayId = activeDisplayId ?? getCursorDisplay().id;
   const target = overlayWindows.get(targetDisplayId);
   if (target && !target.isDestroyed()) return target;
@@ -204,6 +215,17 @@ export async function createOverlayWindow(): Promise<BrowserWindow> {
 
 export function isOverlayActive(): boolean {
   return active;
+}
+
+/**
+ * Return keyboard focus to the active display's overlay. Called after a toolbar
+ * button action, since clicking the (focusable) toolbar window would otherwise
+ * keep focus off the overlay, starving its single-key shortcuts.
+ */
+export function focusActiveOverlay(): void {
+  if (!active || activeDisplayId === null) return;
+  const win = overlayWindows.get(activeDisplayId);
+  if (win && !win.isDestroyed()) win.focus();
 }
 
 export function getActiveDisplayId(): number | null {
@@ -225,6 +247,11 @@ export async function setOverlayActiveDisplay(displayId: number): Promise<void> 
       app.focus({ steal: true });
       win.focus();
     }
+    // Move the toolbar onto the newly-active display and raise it above the
+    // overlays (which moveTop on sync). The renderer re-measures its geometry
+    // off the active-display broadcast and reports fresh bounds.
+    showToolbarWindow(displayId);
+    win?.focus();
   }
 
   logger.info("overlay", `Active drawing display changed to ${displayId}`);
@@ -264,8 +291,18 @@ export async function setOverlayActive(
     app.focus({ steal: true });
     overlayWindows.get(activeDisplayId)?.focus();
     await registerDrawingShortcuts();
+
+    // Re-entering drawing mode always reveals the toolbar (the `T` toggle is
+    // session-only). Raise it after the overlays so it stays clickable above
+    // them (same screen-saver level).
+    resetToolbarHidden();
+    showToolbarWindow(activeDisplayId);
+    // Keep keyboard focus on the active overlay: showing the toolbar must not
+    // steal the focus that the overlay's single-key shortcuts depend on.
+    overlayWindows.get(activeDisplayId)?.focus();
   } else {
     unregisterDrawingShortcuts();
+    hideToolbarWindow();
     for (const win of overlayWindows.values()) {
       if (!win.isDestroyed()) win.hide();
     }

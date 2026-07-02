@@ -22,6 +22,7 @@ import {
   setOverlayActive,
   setOverlayActiveDisplay,
 } from "../windows/overlay-window.js";
+import { applyContentProtection } from "../windows/toolbar-window.js";
 
 export function registerOverlayHandlers(): void {
   ipcMain.handle("overlay:setActive", async (event, active: unknown) => {
@@ -70,6 +71,7 @@ export function registerOverlayHandlers(): void {
         defaultSize?: unknown;
         toolbarPosition?: unknown;
         recentColor?: unknown;
+        hideToolbarInRecordings?: unknown;
       };
       const position = input.toolbarPosition as { x?: unknown; y?: unknown } | null | undefined;
       const next = setDefaults({
@@ -82,7 +84,14 @@ export function registerOverlayHandlers(): void {
               ? { x: position.x, y: position.y }
               : undefined,
         recentColor: typeof input.recentColor === "string" ? input.recentColor : undefined,
+        hideToolbarInRecordings:
+          typeof input.hideToolbarInRecordings === "boolean"
+            ? input.hideToolbarInRecordings
+            : undefined,
       });
+      // Re-apply content protection to the toolbar window whenever the setting
+      // may have changed (no-op if it did not).
+      applyContentProtection();
       broadcast("settings:changed", next);
       return next;
     },

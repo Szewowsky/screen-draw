@@ -58,6 +58,8 @@ export interface ScreenDrawSettings {
   toolbarPosition: ToolbarPosition | null;
   /** Recently picked custom colors, most recent first. */
   recentColors: string[];
+  /** When true, the toolbar window is hidden from screen recordings. */
+  hideToolbarInRecordings: boolean;
 }
 
 export interface ShortcutStatus {

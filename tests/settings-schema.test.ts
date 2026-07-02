@@ -19,7 +19,21 @@ describe("coerceSettings", () => {
       ...legacy,
       toolbarPosition: null,
       recentColors: [],
+      hideToolbarInRecordings: false,
     });
+  });
+
+  it("defaults hideToolbarInRecordings to false when absent (legacy files)", () => {
+    expect(coerceSettings({}).hideToolbarInRecordings).toBe(false);
+    expect(coerceSettings({ shortcut: "Command+Shift+X" }).hideToolbarInRecordings).toBe(false);
+  });
+
+  it("keeps hideToolbarInRecordings only when strictly true", () => {
+    expect(coerceSettings({ hideToolbarInRecordings: true }).hideToolbarInRecordings).toBe(true);
+    // Truthy-but-not-true and non-booleans coerce to false.
+    for (const raw of [1, "true", "yes", {}, [], null]) {
+      expect(coerceSettings({ hideToolbarInRecordings: raw }).hideToolbarInRecordings).toBe(false);
+    }
   });
 
   it("fills partial input with defaults per field", () => {

@@ -22,6 +22,8 @@ export interface ScreenDrawSettings {
   toolbarPosition: ToolbarPosition | null;
   /** Recently picked custom colors, most recent first. */
   recentColors: string[];
+  /** When true, the toolbar window is hidden from screen recordings (content protection). */
+  hideToolbarInRecordings: boolean;
 }
 
 export const DEFAULT_SETTINGS: ScreenDrawSettings = {
@@ -30,6 +32,7 @@ export const DEFAULT_SETTINGS: ScreenDrawSettings = {
   defaultSize: 4,
   toolbarPosition: null,
   recentColors: [],
+  hideToolbarInRecordings: false,
 };
 
 /** Maximum number of remembered custom colors. */
@@ -77,6 +80,7 @@ export function coerceSettings(raw: unknown): ScreenDrawSettings {
         : DEFAULT_SETTINGS.defaultSize,
     toolbarPosition: coerceToolbarPosition(value.toolbarPosition),
     recentColors: coerceRecentColors(value.recentColors),
+    hideToolbarInRecordings: value.hideToolbarInRecordings === true,
   };
 }
 

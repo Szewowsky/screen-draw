@@ -14,6 +14,7 @@ export default defineConfig({
         main: resolve(__dirname, "main-window.html"),
         settings: resolve(__dirname, "settings-window.html"),
         overlay: resolve(__dirname, "overlay-window.html"),
+        toolbar: resolve(__dirname, "toolbar-window.html"),
       },
     },
   },

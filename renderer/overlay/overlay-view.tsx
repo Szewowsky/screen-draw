@@ -1,50 +1,12 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-  type RefObject,
-} from "react";
-import { createPortal } from "react-dom";
-import {
-  Button,
-  SegmentedControl,
-  SegmentedControlItem,
-  Separator,
-  Slider,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "../components/ui";
-import {
-  ArrowUpRight,
-  Circle,
-  Eraser,
-  Ghost,
-  GripVertical,
-  Highlighter,
-  Minus,
-  MousePointer2,
-  Pencil,
-  Redo2,
-  Square,
-  Undo2,
-  X,
-} from "lucide-react";
-import {
-  COLOR_PRESETS,
   MAX_SIZE,
   MIN_SIZE,
   PALETTE,
   isPaletteColor,
   type OverlayTool,
   type ScreenDrawSettings,
-  type ToolbarPosition,
 } from "./constants";
-import { normalizeHexColor } from "./color";
-import { clampToolbarPosition, sanitizeToolbarPosition } from "./toolbar-prefs";
 import {
   arrowHeadPoints,
   beginDrag,
@@ -76,15 +38,21 @@ interface OverlayWindowState {
   activeDisplayId?: number | null;
 }
 
-const TOOLS: { tool: OverlayTool; label: string; key: string; Icon: typeof Pencil }[] = [
-  { tool: "select", label: "Select", key: "V", Icon: MousePointer2 },
-  { tool: "pen", label: "Pen", key: "P", Icon: Pencil },
-  { tool: "highlighter", label: "Highlighter", key: "H", Icon: Highlighter },
-  { tool: "line", label: "Line", key: "L", Icon: Minus },
-  { tool: "arrow", label: "Arrow", key: "A", Icon: ArrowUpRight },
-  { tool: "rectangle", label: "Rectangle", key: "R", Icon: Square },
-  { tool: "ellipse", label: "Ellipse", key: "O", Icon: Circle },
-];
+/**
+ * Single-key → tool map for the overlay's keydown handler. Kept local (rather
+ * than importing the toolbar's TOOLS list) so the overlay bundle stays free of
+ * the toolbar component and its icon imports — the toolbar now lives in its own
+ * window.
+ */
+const TOOL_KEYS: Record<string, OverlayTool> = {
+  v: "select",
+  p: "pen",
+  h: "highlighter",
+  l: "line",
+  a: "arrow",
+  r: "rectangle",
+  o: "ellipse",
+};
 
 /** Padding between a selected shape's bounds and the dashed indicator box. */
 const SELECTION_PADDING = 4;
@@ -200,7 +168,6 @@ export function OverlayView() {
   const [color, setColor] = useState(PALETTE[0].value);
   const [size, setSize] = useState(4);
   const [recentColors, setRecentColors] = useState<string[]>([]);
-  const [toolbarPos, setToolbarPos] = useState<ToolbarPosition | null>(null);
   const [historyState, setHistoryState] = useState({
     canUndo: false,
     canRedo: false,
@@ -210,24 +177,10 @@ export function OverlayView() {
   const activeDisplayIdRef = useRef<number | null>(activeDisplayId);
   activeDisplayIdRef.current = activeDisplayId;
 
-  // Whether the in-overlay color popover is open. Mirrored to a ref so the
-  // window-level keydown handler can let Escape close it before touching the
-  // selection/drawing state (the handler runs in bubble phase, so it must
-  // check this signal itself rather than rely on stopPropagation).
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const pickerOpenRef = useRef(pickerOpen);
-  pickerOpenRef.current = pickerOpen;
-
-  // Session-only toolbar visibility toggled by `T`. Not persisted: re-entering
-  // drawing mode always shows the toolbar again (reset by the active-changed
-  // effect below). Only gates the FloatingToolbar's rendering — drawing and
-  // keyboard shortcuts keep working while the toolbar is hidden.
-  const [hidden, setHidden] = useState(false);
-
   // Vanishing ink (`G`). While ON, a finished stroke is not committed to the
   // model/history — it joins the ephemeral list and fades out on its own. State
-  // for the toolbar's active styling; mirrored to a ref for the once-bound
-  // pointer handler. Sticky across re-activation (unlike `hidden`).
+  // for publishing to the toolbar; mirrored to a ref for the once-bound pointer
+  // handler. Sticky across re-activation.
   const [vanishing, setVanishing] = useState(false);
   const vanishingRef = useRef(vanishing);
   vanishingRef.current = vanishing;
@@ -436,12 +389,6 @@ export function OverlayView() {
         setSize(next.defaultSize);
       }
       setRecentColors(Array.isArray(next?.recentColors) ? next.recentColors : []);
-      setToolbarPos(
-        sanitizeToolbarPosition(next?.toolbarPosition, {
-          width: window.innerWidth,
-          height: window.innerHeight,
-        }),
-      );
       prev = next;
     };
 
@@ -458,21 +405,6 @@ export function OverlayView() {
       });
     })();
     return () => unsub?.();
-  }, []);
-
-  const moveToolbar = useCallback((pos: ToolbarPosition) => {
-    setToolbarPos(
-      clampToolbarPosition(pos, { width: window.innerWidth, height: window.innerHeight }),
-    );
-  }, []);
-
-  const commitToolbarPos = useCallback((pos: ToolbarPosition) => {
-    const clamped = clampToolbarPosition(pos, {
-      width: window.innerWidth,
-      height: window.innerHeight,
-    });
-    setToolbarPos(clamped);
-    void window.screenDraw.ipc.invoke("settings:setDefaults", { toolbarPosition: clamped });
   }, []);
 
   const recordRecentColor = useCallback((value: string) => {
@@ -503,17 +435,46 @@ export function OverlayView() {
     return () => unsub?.();
   }, []);
 
-  // Re-entering drawing mode always reveals the toolbar again: the `T` toggle is
-  // session-only. The overlay stays mounted while drawing is off (main hides the
-  // windows), so reset off the backend's active broadcast rather than remount.
-  // Deactivating also drops any in-flight vanishing ink from the prior session.
+  // Deactivating drops any in-flight vanishing ink from the prior session. (The
+  // toolbar's session-hidden reset now lives in main, which re-shows the toolbar
+  // window on re-activation.)
   useEffect(() => {
     const unsub = window.screenDraw.ipc.on("overlay:active-changed", (params) => {
-      if ((params as { active?: boolean } | undefined)?.active) setHidden(false);
-      else clearEphemerals();
+      if (!(params as { active?: boolean } | undefined)?.active) clearEphemerals();
     });
     return () => unsub?.();
   }, [clearEphemerals]);
+
+  // Publish this overlay's full toolbar-facing state to the toolbar window
+  // (relayed via main) whenever it changes AND this display is active. The
+  // active-display effect below re-publishes on becoming active, so the toolbar
+  // reflects the newly-active overlay after a display switch.
+  const publishState = useCallback(() => {
+    if (!isThisActiveDisplay()) return;
+    void window.screenDraw.ipc.invoke("toolbar:publishState", {
+      tool,
+      color,
+      size,
+      recentColors,
+      canUndo: historyState.canUndo,
+      canRedo: historyState.canRedo,
+      hasShapes: historyState.hasShapes,
+      vanishing,
+    });
+  }, [tool, color, size, recentColors, historyState, vanishing, isThisActiveDisplay]);
+
+  useEffect(() => {
+    publishState();
+  }, [publishState]);
+
+  // Re-publish when this overlay becomes the active display (so the toolbar
+  // shows this overlay's values, not the previously-active one's). Keyed on the
+  // active display; publishState reads the latest state via its own closure.
+  const publishStateRef = useRef(publishState);
+  publishStateRef.current = publishState;
+  useEffect(() => {
+    if (isThisActiveDisplay()) publishStateRef.current();
+  }, [activeDisplayId, isThisActiveDisplay]);
 
   // Undo/redo arrive as backend broadcasts because ⌘Z / ⌘⇧Z are registered as
   // global shortcuts while drawing (the Edit menu would otherwise swallow them).
@@ -529,6 +490,54 @@ export function OverlayView() {
       offRedo?.();
     };
   }, [undo, redo, isThisActiveDisplay]);
+
+  // Apply toolbar actions relayed from main. Only the active display's overlay
+  // acts on them (the toolbar drives whichever display is active).
+  useEffect(() => {
+    const unsub = window.screenDraw.ipc.on("toolbar:action", (params) => {
+      if (!isThisActiveDisplay()) return;
+      const action = params as { type?: string; [key: string]: unknown };
+      switch (action.type) {
+        case "setTool":
+          if (typeof action.tool === "string") changeTool(action.tool as OverlayTool);
+          break;
+        case "setColor":
+          if (typeof action.color === "string") setColor(action.color);
+          break;
+        case "recentColor":
+          if (typeof action.color === "string") recordRecentColor(action.color);
+          break;
+        case "setSize":
+          if (typeof action.size === "number") setSize(action.size);
+          break;
+        case "undo":
+          undo();
+          break;
+        case "redo":
+          redo();
+          break;
+        case "clear":
+          clearAll();
+          break;
+        case "exit":
+          exit();
+          break;
+        case "toggleVanishing":
+          toggleVanishing();
+          break;
+      }
+    });
+    return () => unsub();
+  }, [
+    isThisActiveDisplay,
+    changeTool,
+    recordRecentColor,
+    undo,
+    redo,
+    clearAll,
+    exit,
+    toggleVanishing,
+  ]);
 
   // Canvas setup + pointer + keyboard handlers.
   useEffect(() => {
@@ -606,13 +615,6 @@ export function OverlayView() {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        // The color popover owns Escape while open: close it without touching
-        // the selection or leaving drawing mode.
-        if (pickerOpenRef.current) {
-          e.preventDefault();
-          setPickerOpen(false);
-          return;
-        }
         e.preventDefault();
         // Escape cancels an in-progress move (shape snaps back), then drops
         // the selection; only a further press exits drawing mode.
@@ -637,8 +639,8 @@ export function OverlayView() {
       // Plain single-key shortcuts (skip when a command/control/option modifier is held).
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
-      // Never fire tool shortcuts while typing in a text field (e.g. the color
-      // popover's hex input) — the keystrokes belong to the input.
+      // Never fire tool shortcuts while typing in a text field — the keystrokes
+      // belong to the input.
       const target = e.target;
       if (
         target instanceof HTMLInputElement ||
@@ -657,36 +659,44 @@ export function OverlayView() {
       }
 
       const key = e.key.toLowerCase();
-      // T toggles the toolbar for this session; Shift+T resets its position to
-      // the default and clears the persisted one. Handled before the tool-key
-      // lookup so Shift+T (which arrives as "T") isn't seen as a plain shortcut.
-      // Ignored while the color popover is open so the toolbar doesn't shift out
-      // from under the still-anchored popover.
+
+      // Shift+R toggles hiding the toolbar in recordings. Handled before the
+      // tool-key lookup so it isn't seen as R (Rectangle). Persists through
+      // settings; main re-applies content protection on the toolbar window.
+      if (key === "r" && e.shiftKey) {
+        e.preventDefault();
+        void window.screenDraw.ipc.invoke<ScreenDrawSettings>("settings:get").then((settings) =>
+          window.screenDraw.ipc.invoke("settings:setDefaults", {
+            hideToolbarInRecordings: !settings.hideToolbarInRecordings,
+          }),
+        );
+        return;
+      }
+
+      // T toggles the toolbar window for this session; Shift+T resets its
+      // position to the default and clears the persisted one. Handled before the
+      // tool-key lookup so Shift+T (which arrives as "T") isn't seen as R/plain.
       if (key === "t") {
-        if (pickerOpenRef.current) return;
         e.preventDefault();
         if (e.shiftKey) {
-          setToolbarPos(null);
           void window.screenDraw.ipc.invoke("settings:setDefaults", { toolbarPosition: null });
         } else {
-          setHidden((h) => !h);
+          void window.screenDraw.ipc.invoke("toolbar:action", { type: "toggleHidden" });
         }
         return;
       }
 
-      // G toggles vanishing ink. Ignored while the color popover is open, for
-      // consistency with T.
+      // G toggles vanishing ink.
       if (key === "g") {
-        if (pickerOpenRef.current) return;
         e.preventDefault();
         toggleVanishing();
         return;
       }
 
-      const toolForKey = TOOLS.find((t) => t.key.toLowerCase() === key);
+      const toolForKey = TOOL_KEYS[key];
       if (toolForKey) {
         e.preventDefault();
-        changeTool(toolForKey.tool);
+        changeTool(toolForKey);
       } else if (key === "c") {
         e.preventDefault();
         clearAll();
@@ -729,12 +739,6 @@ export function OverlayView() {
     toggleVanishing,
   ]);
 
-  const showToolbar =
-    !hidden &&
-    (displayIdRef.current === null ||
-      activeDisplayId === null ||
-      displayIdRef.current === activeDisplayId);
-
   return (
     <div className="fixed inset-0 h-full w-full">
       <canvas
@@ -743,510 +747,6 @@ export function OverlayView() {
           "absolute inset-0 " + (tool === "select" ? "cursor-default" : "cursor-crosshair")
         }
       />
-      {showToolbar ? (
-        <FloatingToolbar
-          tool={tool}
-          onToolChange={changeTool}
-          color={color}
-          onColorChange={setColor}
-          onColorCommit={recordRecentColor}
-          recentColors={recentColors}
-          pickerOpen={pickerOpen}
-          onPickerOpenChange={setPickerOpen}
-          size={size}
-          onSizeChange={setSize}
-          vanishing={vanishing}
-          onVanishingToggle={toggleVanishing}
-          pos={toolbarPos}
-          onPosChange={moveToolbar}
-          onPosCommit={commitToolbarPos}
-          canUndo={historyState.canUndo}
-          onUndo={undo}
-          canRedo={historyState.canRedo}
-          onRedo={redo}
-          canClear={historyState.hasShapes}
-          onClear={clearAll}
-          onExit={exit}
-        />
-      ) : null}
     </div>
-  );
-}
-
-interface FloatingToolbarProps {
-  tool: OverlayTool;
-  onToolChange: (tool: OverlayTool) => void;
-  color: string;
-  onColorChange: (color: string) => void;
-  onColorCommit: (color: string) => void;
-  recentColors: string[];
-  pickerOpen: boolean;
-  onPickerOpenChange: (open: boolean) => void;
-  size: number;
-  onSizeChange: (size: number) => void;
-  vanishing: boolean;
-  onVanishingToggle: () => void;
-  pos: ToolbarPosition | null;
-  onPosChange: (pos: ToolbarPosition) => void;
-  onPosCommit: (pos: ToolbarPosition) => void;
-  canUndo: boolean;
-  onUndo: () => void;
-  canRedo: boolean;
-  onRedo: () => void;
-  canClear: boolean;
-  onClear: () => void;
-  onExit: () => void;
-}
-
-function FloatingToolbar({
-  tool,
-  onToolChange,
-  color,
-  onColorChange,
-  onColorCommit,
-  recentColors,
-  pickerOpen,
-  onPickerOpenChange,
-  size,
-  onSizeChange,
-  vanishing,
-  onVanishingToggle,
-  pos,
-  onPosChange,
-  onPosCommit,
-  canUndo,
-  onUndo,
-  canRedo,
-  onRedo,
-  canClear,
-  onClear,
-  onExit,
-}: FloatingToolbarProps) {
-  const barRef = useRef<HTMLDivElement>(null);
-  const dragOffset = useRef<{ x: number; y: number } | null>(null);
-  const lastDragPos = useRef<ToolbarPosition | null>(null);
-
-  const onGripDown = (e: ReactPointerEvent) => {
-    const rect = barRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-
-    const onMove = (ev: PointerEvent) => {
-      if (!dragOffset.current) return;
-      const next = { x: ev.clientX - dragOffset.current.x, y: ev.clientY - dragOffset.current.y };
-      lastDragPos.current = next;
-      onPosChange(next);
-    };
-    const onUp = () => {
-      dragOffset.current = null;
-      if (lastDragPos.current) {
-        onPosCommit(lastDragPos.current);
-        lastDragPos.current = null;
-      }
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  };
-
-  const customColors = recentColors.filter((c) => !isPaletteColor(c));
-
-  const swatchRef = useRef<HTMLButtonElement>(null);
-
-  const applyColor = useCallback(
-    (value: string) => {
-      onColorChange(value);
-      onColorCommit(value);
-      onPickerOpenChange(false);
-    },
-    [onColorChange, onColorCommit, onPickerOpenChange],
-  );
-
-  return (
-    <div
-      ref={barRef}
-      className={
-        "fixed z-30 flex h-9 items-center gap-0.5 rounded-[12px] border border-white/10 bg-[#1d1d1f]/95 px-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl" +
-        (pos ? "" : " bottom-[88px] left-1/2 -translate-x-1/2")
-      }
-      style={pos ? { left: pos.x, top: pos.y } : undefined}
-    >
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            aria-label="Move toolbar"
-            onPointerDown={onGripDown}
-            className="flex h-6 w-4 cursor-grab items-center justify-center text-tertiary active:cursor-grabbing"
-          >
-            <GripVertical className="size-3.5" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>Drag to move</TooltipContent>
-      </Tooltip>
-
-      <Separator orientation="vertical" />
-
-      <SegmentedControl
-        type="single"
-        size="small"
-        value={tool}
-        className="!rounded-[11px] !p-1"
-        onValueChange={(value) => {
-          if (typeof value === "string" && value) onToolChange(value as OverlayTool);
-        }}
-        aria-label="Drawing tool"
-      >
-        {TOOLS.map(({ tool: t, label, key, Icon }) => (
-          <Tooltip key={t}>
-            <TooltipTrigger asChild>
-              <SegmentedControlItem
-                value={t}
-                iconOnly
-                className="!size-6 !rounded-md"
-                aria-label={label}
-              >
-                <Icon className="size-3.5" />
-              </SegmentedControlItem>
-            </TooltipTrigger>
-            <TooltipContent shortcut={[key]}>{label}</TooltipContent>
-          </Tooltip>
-        ))}
-      </SegmentedControl>
-
-      <Separator orientation="vertical" />
-
-      <SegmentedControl
-        type="single"
-        size="small"
-        value={color}
-        className="!rounded-[11px] !p-1"
-        onValueChange={(value) => {
-          if (typeof value === "string" && value) onColorChange(value);
-        }}
-        aria-label="Color"
-      >
-        {PALETTE.map((c, i) => (
-          <Tooltip key={c.value}>
-            <TooltipTrigger asChild>
-              <SegmentedControlItem
-                value={c.value}
-                iconOnly
-                className="!size-6 !rounded-md"
-                aria-label={c.name}
-              >
-                <span className="size-3.5 rounded-full" style={{ backgroundColor: c.value }} />
-              </SegmentedControlItem>
-            </TooltipTrigger>
-            <TooltipContent shortcut={[String(i + 1)]}>{c.name}</TooltipContent>
-          </Tooltip>
-        ))}
-        {customColors.map((c) => (
-          <Tooltip key={c}>
-            <TooltipTrigger asChild>
-              <SegmentedControlItem
-                value={c}
-                iconOnly
-                className="!size-6 !rounded-md"
-                aria-label={`Recent color ${c}`}
-              >
-                <span className="size-3.5 rounded-full" style={{ backgroundColor: c }} />
-              </SegmentedControlItem>
-            </TooltipTrigger>
-            <TooltipContent>Recent color</TooltipContent>
-          </Tooltip>
-        ))}
-      </SegmentedControl>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            ref={swatchRef}
-            type="button"
-            aria-label="Custom color"
-            aria-haspopup="dialog"
-            aria-expanded={pickerOpen}
-            onClick={() => onPickerOpenChange(!pickerOpen)}
-            className="no-drag size-7 shrink-0 rounded-md border border-white/15 shadow-inner"
-            style={{ backgroundColor: color }}
-          />
-        </TooltipTrigger>
-        <TooltipContent>Custom color</TooltipContent>
-      </Tooltip>
-      {pickerOpen ? (
-        <ColorPopover
-          anchorRef={swatchRef}
-          color={color}
-          recentColors={customColors}
-          onApply={applyColor}
-          onClose={() => onPickerOpenChange(false)}
-        />
-      ) : null}
-
-      <Separator orientation="vertical" />
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="w-[68px]">
-            <Slider
-              variant="filled"
-              size="small"
-              className="!h-7 w-full !rounded-md"
-              value={[size]}
-              min={MIN_SIZE}
-              max={MAX_SIZE}
-              step={1}
-              onValueChange={(value) => onSizeChange(value[0])}
-              endContent={(v) => <span className="tabular-nums">{v}</span>}
-              endContentClassName="!min-w-7 !pr-2.5 !text-sm"
-              aria-label="Brush size"
-            />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent shortcut={["[", "]"]}>Brush size</TooltipContent>
-      </Tooltip>
-
-      <Separator orientation="vertical" />
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="transparent"
-            size="small"
-            iconOnly
-            className={
-              "!size-6" + (vanishing ? " !bg-orange-500/95 !text-white hover:!bg-orange-500" : "")
-            }
-            aria-pressed={vanishing}
-            onClick={onVanishingToggle}
-            aria-label="Vanishing ink"
-          >
-            <Ghost className="size-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent shortcut={["G"]}>Vanishing ink</TooltipContent>
-      </Tooltip>
-
-      <Separator orientation="vertical" />
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="transparent"
-            size="small"
-            iconOnly
-            className="!size-6"
-            disabled={!canUndo}
-            onClick={onUndo}
-            aria-label="Undo"
-          >
-            <Undo2 className="size-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent shortcut={["⌘", "Z"]}>Undo</TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="transparent"
-            size="small"
-            iconOnly
-            className="!size-6"
-            disabled={!canRedo}
-            onClick={onRedo}
-            aria-label="Redo"
-          >
-            <Redo2 className="size-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent shortcut={["⌘", "⇧", "Z"]}>Redo</TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="transparent"
-            size="small"
-            iconOnly
-            className="!size-6"
-            disabled={!canClear}
-            onClick={onClear}
-            aria-label="Clear all"
-          >
-            <Eraser className="size-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent shortcut={["C"]}>Clear all</TooltipContent>
-      </Tooltip>
-
-      <Separator orientation="vertical" />
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="transparent"
-            size="small"
-            iconOnly
-            className="!size-6"
-            onClick={onExit}
-            aria-label="Stop drawing"
-          >
-            <X className="size-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent shortcut={["Esc"]}>Stop drawing</TooltipContent>
-      </Tooltip>
-    </div>
-  );
-}
-
-interface ColorPopoverProps {
-  anchorRef: RefObject<HTMLButtonElement | null>;
-  color: string;
-  recentColors: string[];
-  onApply: (color: string) => void;
-  onClose: () => void;
-}
-
-/** Estimated popover size, used to place it before it has measured itself. */
-const POPOVER_WIDTH = 168;
-const POPOVER_HEIGHT = 200;
-const POPOVER_GAP = 8;
-const POPOVER_MARGIN = 8;
-
-/**
- * In-window color picker rendered as plain DOM inside the overlay (the native
- * macOS color panel would open behind the screen-saver-level overlay). Shows a
- * preset grid, the recent-colors row, and a hex input. Positions itself above
- * the anchoring swatch, flipping below when there is no room. Closes on outside
- * click; Escape is handled by the overlay's window keydown listener.
- */
-function ColorPopover({ anchorRef, color, recentColors, onApply, onClose }: ColorPopoverProps) {
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const [hex, setHex] = useState("");
-  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
-
-  // Place the popover relative to the swatch: above by default, below when the
-  // toolbar sits near the top edge; clamp horizontally into the viewport.
-  useLayoutEffect(() => {
-    const anchor = anchorRef.current;
-    if (!anchor) return;
-    const rect = anchor.getBoundingClientRect();
-    const height = popoverRef.current?.offsetHeight ?? POPOVER_HEIGHT;
-    const width = popoverRef.current?.offsetWidth ?? POPOVER_WIDTH;
-    const above = rect.top - POPOVER_GAP - height;
-    const below = rect.bottom + POPOVER_GAP;
-    const top = above >= POPOVER_MARGIN ? above : below;
-    const centered = rect.left + rect.width / 2 - width / 2;
-    const maxLeft = window.innerWidth - width - POPOVER_MARGIN;
-    const left = Math.min(Math.max(POPOVER_MARGIN, centered), Math.max(POPOVER_MARGIN, maxLeft));
-    setPos({ left, top });
-  }, [anchorRef]);
-
-  // Close when clicking anywhere outside the popover (but not on the anchor,
-  // whose own click toggles the popover).
-  useEffect(() => {
-    const onPointerDown = (e: PointerEvent) => {
-      const node = e.target as Node;
-      if (popoverRef.current?.contains(node)) return;
-      if (anchorRef.current?.contains(node)) return;
-      onClose();
-    };
-    // Capture phase so the canvas's own pointerdown does not run first.
-    window.addEventListener("pointerdown", onPointerDown, true);
-    return () => window.removeEventListener("pointerdown", onPointerDown, true);
-  }, [anchorRef, onClose]);
-
-  const submitHex = () => {
-    const normalized = normalizeHexColor(hex);
-    if (normalized) onApply(normalized);
-  };
-
-  const normalizedHex = normalizeHexColor(hex);
-  const hexInvalid = hex.trim() !== "" && normalizedHex === null;
-
-  // Rendered through a portal to document.body: the toolbar div uses `transform`
-  // (default -translate-x-1/2) and `backdrop-filter`, both of which would make a
-  // `position: fixed` descendant resolve against the toolbar box instead of the
-  // viewport, throwing the popover off-screen.
-  return createPortal(
-    <div
-      ref={popoverRef}
-      role="dialog"
-      aria-label="Color picker"
-      className="no-drag fixed z-40 flex w-[168px] flex-col gap-2 rounded-[12px] border border-white/10 bg-[#1d1d1f]/95 p-2.5 shadow-[0_12px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl"
-      style={pos ? { left: pos.left, top: pos.top } : { left: -9999, top: -9999 }}
-    >
-      <div className="grid grid-cols-5 gap-1.5">
-        {COLOR_PRESETS.map((c) => {
-          const selected = c.toLowerCase() === color.toLowerCase();
-          return (
-            <button
-              key={c}
-              type="button"
-              aria-label={c}
-              onClick={() => onApply(c)}
-              className={
-                "size-6 rounded-md border shadow-inner " +
-                (selected ? "border-white ring-1 ring-white" : "border-white/15")
-              }
-              style={{ backgroundColor: c }}
-            />
-          );
-        })}
-      </div>
-
-      {recentColors.length > 0 ? (
-        <>
-          <Separator orientation="horizontal" />
-          <div className="flex flex-wrap gap-1.5">
-            {recentColors.map((c) => (
-              <button
-                key={c}
-                type="button"
-                aria-label={`Recent color ${c}`}
-                onClick={() => onApply(c)}
-                className="size-6 rounded-md border border-white/15 shadow-inner"
-                style={{ backgroundColor: c }}
-              />
-            ))}
-          </div>
-        </>
-      ) : null}
-
-      <Separator orientation="horizontal" />
-
-      <div className="flex items-center gap-1.5">
-        <span
-          className="size-6 shrink-0 rounded-md border border-white/15 shadow-inner"
-          style={{ backgroundColor: normalizedHex ?? color }}
-        />
-        <input
-          type="text"
-          value={hex}
-          spellCheck={false}
-          autoComplete="off"
-          placeholder="#rrggbb"
-          aria-label="Hex color"
-          aria-invalid={hexInvalid}
-          onChange={(e) => setHex(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            // Enter applies the hex value; Escape is left to bubble to the
-            // overlay's window keydown, which closes the popover.
-            if (e.key === "Enter") {
-              e.preventDefault();
-              submitHex();
-            }
-          }}
-          className={
-            "h-6 w-full min-w-0 rounded-md border bg-black/30 px-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-500 " +
-            (hexInvalid ? "border-red-500/70" : "border-white/15 focus:border-white/30")
-          }
-        />
-      </div>
-    </div>,
-    document.body,
   );
 }

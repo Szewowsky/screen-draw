@@ -20,9 +20,14 @@ type NativeThemeInfo = {
   shouldUseDarkColors: boolean;
 };
 
+type ScreenDrawSettings = {
+  hideToolbarInRecordings: boolean;
+};
+
 export function SettingsView() {
   const [themeInfo, setThemeInfo] = useState<NativeThemeInfo | null>(null);
   const [_isLoading, setIsLoading] = useState(true);
+  const [hideToolbarInRecordings, setHideToolbarInRecordings] = useState(false);
 
   // Close settings window on Escape, unless an interactive element is focused or a popover is open
   useEffect(() => {
@@ -67,6 +72,19 @@ export function SettingsView() {
     refreshThemeInfo();
   }, []);
 
+  // Load the recording toggle and follow changes made elsewhere (e.g. Shift+R
+  // while drawing).
+  useEffect(() => {
+    void window.screenDraw.ipc
+      .invoke<ScreenDrawSettings>("settings:get")
+      .then((s) => setHideToolbarInRecordings(s.hideToolbarInRecordings === true))
+      .catch(() => {});
+    const unsub = window.screenDraw.ipc.on("settings:changed", (params) => {
+      setHideToolbarInRecordings((params as ScreenDrawSettings).hideToolbarInRecordings === true);
+    });
+    return () => unsub();
+  }, []);
+
   const handleThemeChange = async (value: string) => {
     const source = value as "system" | "light" | "dark";
     try {
@@ -74,6 +92,18 @@ export function SettingsView() {
       await refreshThemeInfo();
     } catch (error) {
       toast.error(`Failed to set theme: ${error}`);
+    }
+  };
+
+  const handleHideToolbarChange = async (value: string) => {
+    const next = value === "on";
+    setHideToolbarInRecordings(next);
+    try {
+      await window.screenDraw.ipc.invoke("settings:setDefaults", {
+        hideToolbarInRecordings: next,
+      });
+    } catch (error) {
+      toast.error(`Failed to update setting: ${error}`);
     }
   };
 
@@ -110,6 +140,27 @@ export function SettingsView() {
                 <Label>
                   <RadioGroupItem value="dark" />
                   Dark
+                </Label>
+              </RadioGroup>
+            </Field>
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldLabel htmlFor="hide-toolbar-in-recordings">
+                  Hide toolbar in recordings
+                </FieldLabel>
+              </FieldContent>
+              <RadioGroup
+                value={hideToolbarInRecordings ? "on" : "off"}
+                onValueChange={handleHideToolbarChange}
+                orientation="horizontal"
+              >
+                <Label>
+                  <RadioGroupItem value="off" />
+                  Off
+                </Label>
+                <Label>
+                  <RadioGroupItem value="on" />
+                  On
                 </Label>
               </RadioGroup>
             </Field>

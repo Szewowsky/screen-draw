@@ -73,6 +73,8 @@ export function setDefaults(partial: {
   toolbarPosition?: ToolbarPosition | null;
   /** A custom color to record in the recent list (does not change the default color). */
   recentColor?: string;
+  /** Toggle hiding the toolbar window from screen recordings; undefined leaves it unchanged. */
+  hideToolbarInRecordings?: boolean;
 }): ScreenDrawSettings {
   const current = getSettings();
   persist(
@@ -85,6 +87,10 @@ export function setDefaults(partial: {
       recentColors: partial.recentColor
         ? addRecentColor(current.recentColors, partial.recentColor)
         : current.recentColors,
+      hideToolbarInRecordings:
+        partial.hideToolbarInRecordings !== undefined
+          ? partial.hideToolbarInRecordings
+          : current.hideToolbarInRecordings,
     }),
   );
   return getSettings();
