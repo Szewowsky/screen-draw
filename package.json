@@ -32,9 +32,11 @@
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
+    "@babel/core": "^8.0.1",
     "@eslint/js": "^9.22.0",
     "@rolldown/plugin-babel": "^0.2.1",
     "@tailwindcss/vite": "^4.2.2",
+    "@types/babel__core": "^7.20.5",
     "@types/node": "^24.3.1",
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",

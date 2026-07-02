@@ -1,14 +1,16 @@
+import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
-import react from "@vitejs/plugin-react";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
 
 export default defineConfig({
   base: "./",
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), babel({ presets: [reactCompilerPreset()] }), tailwindcss()],
   build: {
     outDir: "build",
     emptyOutDir: true,
+    target: "chrome150",
     rollupOptions: {
       input: {
         main: resolve(__dirname, "main-window.html"),
