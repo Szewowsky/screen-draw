@@ -1,14 +1,25 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { RouterProvider } from "@tanstack/react-router";
-import { router, queryClient } from "./router";
 import "../styles.css";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { TooltipProvider, Toaster } from "../components/ui";
+import { ErrorBoundaryView, TooltipProvider, Toaster } from "../components/ui";
+import { RootView } from "./root-view";
 
 declare const __APP_DISPLAY_NAME__: string | undefined;
 
 document.title = __APP_DISPLAY_NAME__ || document.title;
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) return <ErrorBoundaryView />;
+    return this.props.children;
+  }
+}
 
 // Get the root element
 const rootElement = document.getElementById("root");
@@ -20,12 +31,12 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <RouterProvider router={router} />
-      </TooltipProvider>
-      <Toaster />
-    </QueryClientProvider>
+    <TooltipProvider>
+      <ErrorBoundary>
+        <RootView />
+      </ErrorBoundary>
+    </TooltipProvider>
+    <Toaster />
   </React.StrictMode>,
 );
 

@@ -1,5 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   Button,
   ColorWell,
@@ -151,57 +150,61 @@ function ShortcutKeys({ accelerator }: { accelerator: string }) {
 }
 
 export function HomeView() {
-  const queryClient = useQueryClient();
+  const [settings, setSettings] = useState<ScreenDrawSettings | undefined>(undefined);
+  const [shortcutStatus, setShortcutStatus] = useState<ShortcutStatus | undefined>(undefined);
   const [active, setActive] = useState(false);
   const [sticky, setSticky] = useState(false);
   const [capturing, setCapturing] = useState(false);
 
-  const { data: settings } = useQuery({
-    queryKey: ["settings"],
-    queryFn: () => window.screenDraw.ipc.invoke<ScreenDrawSettings>("settings:get"),
-  });
+  // Initial settings + shortcut status fetches.
+  useEffect(() => {
+    void window.screenDraw.ipc
+      .invoke<ScreenDrawSettings>("settings:get")
+      .then((next) => setSettings(next));
+    void window.screenDraw.ipc
+      .invoke<ShortcutStatus>("shortcut:getStatus")
+      .then((next) => setShortcutStatus(next));
+  }, []);
 
-  const { data: shortcutStatus } = useQuery({
-    queryKey: ["shortcutStatus"],
-    queryFn: () => window.screenDraw.ipc.invoke<ShortcutStatus>("shortcut:getStatus"),
-  });
-
-  const shortcutMutation = useMutation({
-    mutationFn: (shortcut: string) =>
-      window.screenDraw.ipc.invoke<{
+  const applyShortcut = useCallback((shortcut: string) => {
+    window.screenDraw.ipc
+      .invoke<{
         settings: ScreenDrawSettings;
         registered: boolean;
         status: ShortcutStatus;
-      }>("settings:setShortcut", shortcut),
-    onSuccess: (next) => {
-      queryClient.setQueryData(["settings"], next.settings);
-      queryClient.setQueryData(["shortcutStatus"], next.status);
-    },
-    onError: (error) => toast.error(`Couldn't register shortcut: ${error}`),
-  });
+      }>("settings:setShortcut", shortcut)
+      .then((next) => {
+        setSettings(next.settings);
+        setShortcutStatus(next.status);
+      })
+      .catch((error) => toast.error(`Couldn't register shortcut: ${error}`));
+  }, []);
 
   // Startup registration failures are broadcast before this window loads, so the
-  // initial query covers them; this keeps later changes in sync.
+  // initial fetch covers them; this keeps later changes in sync.
   useEffect(() => {
     const unsub = window.screenDraw.ipc.on("shortcut:status-changed", (params) => {
-      queryClient.setQueryData(["shortcutStatus"], params as ShortcutStatus);
+      setShortcutStatus(params as ShortcutStatus);
     });
     return () => unsub();
-  }, [queryClient]);
+  }, []);
 
-  const defaultsMutation = useMutation({
-    mutationFn: (partial: { defaultColor?: string; defaultSize?: number; recentColor?: string }) =>
-      window.screenDraw.ipc.invoke<ScreenDrawSettings>("settings:setDefaults", partial),
-    onSuccess: (next) => queryClient.setQueryData(["settings"], next),
-  });
+  const applyDefaults = useCallback(
+    (partial: { defaultColor?: string; defaultSize?: number; recentColor?: string }) => {
+      void window.screenDraw.ipc
+        .invoke<ScreenDrawSettings>("settings:setDefaults", partial)
+        .then((next) => setSettings(next));
+    },
+    [],
+  );
 
   // Follow settings changes made elsewhere (e.g. colors picked in the overlay toolbar).
   useEffect(() => {
     const unsub = window.screenDraw.ipc.on("settings:changed", (params) => {
-      queryClient.setQueryData(["settings"], params as ScreenDrawSettings);
+      setSettings(params as ScreenDrawSettings);
     });
     return () => unsub();
-  }, [queryClient]);
+  }, []);
 
   // Track overlay tri-state (drawing / sticky / hidden) broadcast from the backend.
   useEffect(() => {
@@ -230,13 +233,13 @@ export function HomeView() {
       }
       const accelerator = eventToAccelerator(e);
       if (accelerator) {
-        shortcutMutation.mutate(accelerator);
+        applyShortcut(accelerator);
         setCapturing(false);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [capturing, shortcutMutation]);
+  }, [capturing, applyShortcut]);
 
   const toggleDrawing = () => {
     void window.screenDraw.ipc.invoke("overlay:setActive", !active);
@@ -324,8 +327,7 @@ export function HomeView() {
                 size="small"
                 value={color}
                 onValueChange={(value) => {
-                  if (typeof value === "string" && value)
-                    defaultsMutation.mutate({ defaultColor: value });
+                  if (typeof value === "string" && value) applyDefaults({ defaultColor: value });
                 }}
                 aria-label="Default color"
               >
@@ -342,9 +344,9 @@ export function HomeView() {
               </SegmentedControl>
               <ColorWell
                 value={color}
-                onChange={(value) => defaultsMutation.mutate({ defaultColor: value })}
+                onChange={(value) => applyDefaults({ defaultColor: value })}
                 onCommit={(value) => {
-                  if (!isPaletteColor(value)) defaultsMutation.mutate({ recentColor: value });
+                  if (!isPaletteColor(value)) applyDefaults({ recentColor: value });
                 }}
                 size="small"
                 aria-label="Custom default color"
@@ -360,7 +362,7 @@ export function HomeView() {
               min={MIN_SIZE}
               max={MAX_SIZE}
               step={1}
-              onValueChange={(value) => defaultsMutation.mutate({ defaultSize: value[0] })}
+              onValueChange={(value) => applyDefaults({ defaultSize: value[0] })}
               startContent={<Pencil className="size-3.5" />}
               endContent={(v) => <span className="tabular-nums">{v}</span>}
               aria-label="Default brush size"
