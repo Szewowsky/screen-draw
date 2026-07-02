@@ -31,6 +31,15 @@ export const HISTORY_LIMIT = 100;
 /** Extra grab distance beyond the painted stroke, so thin lines stay selectable. */
 export const HIT_TOLERANCE = 4;
 
+/**
+ * Minimum spacing (CSS px) between stored freehand points. A pointermove closer
+ * than this to the last stored point is dropped, keeping long slow strokes from
+ * collecting thousands of near-coincident points (which the renderer re-strokes
+ * each frame). A committed stroke may therefore fall up to this far short of the
+ * exact pointer-up position — visually indistinguishable.
+ */
+export const MIN_POINT_DISTANCE = 1.5;
+
 /** An in-progress move of the selected shape (the shape is lifted out of `shapes`). */
 export interface DragState {
   /** Z-order position the shape is restored to when the drag ends. */
@@ -113,8 +122,16 @@ export function updateShape(model: DrawingModel, point: Point, shift: boolean): 
   const start = current.points[0];
   let points: readonly Point[];
   if (current.tool === "pen" || current.tool === "highlighter") {
-    // Shift collapses the freehand stroke to a straight origin → cursor line.
-    points = shift ? [start, point] : [...current.points, point];
+    if (shift) {
+      // Shift collapses the freehand stroke to a straight origin → cursor line.
+      points = [start, point];
+    } else {
+      // Thin sub-`MIN_POINT_DISTANCE` moves: return the same model reference so
+      // the caller skips the repaint entirely. The first point is always kept.
+      const last = current.points[current.points.length - 1];
+      if (Math.hypot(point.x - last.x, point.y - last.y) < MIN_POINT_DISTANCE) return model;
+      points = [...current.points, point];
+    }
   } else {
     points = [start, constrainPoint(current.tool, start, point, shift)];
   }

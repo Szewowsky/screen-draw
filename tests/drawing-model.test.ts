@@ -9,6 +9,7 @@ import {
   createModel,
   discardCurrent,
   getBounds,
+  MIN_POINT_DISTANCE,
   redo,
   startShape,
   undo,
@@ -74,6 +75,74 @@ describe("point collection", () => {
     expect(model.current?.points).toEqual([
       { x: 0, y: 0 },
       { x: 9, y: 2 },
+    ]);
+  });
+});
+
+describe("point thinning", () => {
+  it("appends a freehand point that is at least MIN_POINT_DISTANCE away", () => {
+    let model = startShape(createModel(), PEN, { x: 0, y: 0 });
+    model = updateShape(model, { x: MIN_POINT_DISTANCE, y: 0 }, false);
+    expect(model.current?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: MIN_POINT_DISTANCE, y: 0 },
+    ]);
+  });
+
+  it("drops a sub-threshold freehand point, returning the identical model reference", () => {
+    const model = startShape(createModel(), PEN, { x: 0, y: 0 });
+    const next = updateShape(model, { x: MIN_POINT_DISTANCE / 2, y: 0 }, false);
+    expect(next).toBe(model);
+  });
+
+  it("thins for the highlighter too", () => {
+    const model = startShape(createModel(), { ...PEN, tool: "highlighter" }, { x: 0, y: 0 });
+    const next = updateShape(model, { x: 1, y: 0 }, false);
+    expect(next).toBe(model);
+  });
+
+  it("measures distance from the last stored point, not the stroke origin", () => {
+    let model = startShape(createModel(), PEN, { x: 0, y: 0 });
+    model = updateShape(model, { x: 10, y: 0 }, false);
+    // A move within MIN_POINT_DISTANCE of the last point (10,0) is dropped,
+    // even though it is far from the origin.
+    const next = updateShape(model, { x: 10.5, y: 0 }, false);
+    expect(next).toBe(model);
+  });
+
+  it("does not thin the Shift-line path (collapses to [start, point] regardless of distance)", () => {
+    let model = startShape(createModel(), PEN, { x: 0, y: 0 });
+    model = updateShape(model, { x: 5, y: 5 }, false);
+    // A sub-threshold Shift move still collapses the stroke.
+    model = updateShape(model, { x: 5.1, y: 5 }, true);
+    expect(model.current?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 5.1, y: 5 },
+    ]);
+  });
+
+  it("does not thin shape tools (they keep two points at the cursor)", () => {
+    for (const tool of ["line", "arrow", "rectangle", "ellipse"] as const) {
+      let model = startShape(createModel(), { ...PEN, tool }, { x: 0, y: 0 });
+      // A sub-threshold move still updates the end point.
+      model = updateShape(model, { x: MIN_POINT_DISTANCE / 2, y: 0 }, false);
+      expect(model.current?.points).toEqual([
+        { x: 0, y: 0 },
+        { x: MIN_POINT_DISTANCE / 2, y: 0 },
+      ]);
+    }
+  });
+
+  it("commits the thinned points after a stroke with sub-threshold moves", () => {
+    let model = startShape(createModel(), PEN, { x: 0, y: 0 });
+    model = updateShape(model, { x: 10, y: 0 }, false); // kept
+    model = updateShape(model, { x: 10.5, y: 0 }, false); // thinned
+    model = updateShape(model, { x: 20, y: 0 }, false); // kept
+    model = commitShape(model);
+    expect(model.shapes[0].points).toEqual([
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 20, y: 0 },
     ]);
   });
 });
