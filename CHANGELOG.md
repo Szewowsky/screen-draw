@@ -2,6 +2,11 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
+## [Unreleased]
+
+### Added
+- **Toolbar toggle for "hidden in recordings"**: a new button on the floating toolbar shows the current content-protection state at a glance and lights up (accent) when the toolbar is hidden from screen recordings. Clicking it flips the setting; it stays in sync with `⇧R` and the Settings window.
+
 ## 1.2.0 — 2026-07-02
 
 ### Fixed

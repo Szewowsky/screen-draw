@@ -83,6 +83,7 @@ export function ToolbarView() {
     hasEphemerals: false,
   });
   const [vanishing, setVanishing] = useState(false);
+  const [hideInRecordings, setHideInRecordings] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   // Display-relative desired top-left of the bar; null = default bottom-center.
@@ -223,6 +224,24 @@ export function ToolbarView() {
     return () => unsub();
   }, [reportBounds]);
 
+  // The hidden-in-recordings state lives in settings and syncs over
+  // settings:changed (the same channel the Settings window and Shift+R use), not
+  // through the overlay's toolbar:state. Seed on mount and follow broadcasts so
+  // the on-bar toggle, Shift+R, and the Settings window stay in sync; the button
+  // click only invokes the atomic flip and lets the broadcast drive this state.
+  useEffect(() => {
+    void window.screenDraw.ipc
+      .invoke<{ hideToolbarInRecordings?: boolean }>("settings:get")
+      .then((s) => setHideInRecordings(s.hideToolbarInRecordings === true))
+      .catch(() => {});
+    const unsub = window.screenDraw.ipc.on("settings:changed", (params) => {
+      setHideInRecordings(
+        (params as { hideToolbarInRecordings?: boolean }).hideToolbarInRecordings === true,
+      );
+    });
+    return () => unsub();
+  }, []);
+
   // Measure the bar and report bounds whenever its size changes (initial layout,
   // and when recents grow it). Also re-report when the popover opens/closes.
   useLayoutEffect(() => {
@@ -346,6 +365,12 @@ export function ToolbarView() {
           onVanishingToggle={() => {
             setVanishing((v) => !v);
             action({ type: "toggleVanishing" });
+          }}
+          hideInRecordings={hideInRecordings}
+          onHideInRecordingsToggle={() => {
+            void window.screenDraw.ipc.invoke("settings:setDefaults", {
+              toggleHideToolbarInRecordings: true,
+            });
           }}
           onGripDrag={onGripDrag}
           onGripDragEnd={onGripDragEnd}

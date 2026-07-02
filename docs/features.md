@@ -57,7 +57,7 @@ A separate always-on-top bar on the active display, draggable by its grip; the p
 | Reset toolbar to the default position | `⇧T` |
 | Toggle "hidden in screen recordings" | `⇧R` |
 
-**Hidden in recordings**: with the setting on (Settings window or `⇧R`), the toolbar window gets macOS content protection — you see it on the physical screen, but screen recorders (QuickTime, OBS) and screen sharing don't capture it. Your drawings are always captured.
+**Hidden in recordings**: with the setting on (the toolbar's recordings button, Settings window, or `⇧R`), the toolbar window gets macOS content protection — you see it on the physical screen, but screen recorders (QuickTime, OBS) and screen sharing don't capture it. Your drawings are always captured. The toolbar carries a recordings button that lights up while the setting is on, so you can tell at a glance whether the bar is being captured; it, `⇧R`, and the Settings window all stay in sync.
 
 ## App presence
 

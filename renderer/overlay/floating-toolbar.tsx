@@ -46,6 +46,7 @@ import {
   Redo2,
   Square,
   Undo2,
+  VideoOff,
   X,
 } from "lucide-react";
 import {
@@ -81,6 +82,10 @@ interface FloatingToolbarProps {
   onSizeChange: (size: number) => void;
   vanishing: boolean;
   onVanishingToggle: () => void;
+  /** Whether the toolbar window is hidden from screen recordings (content protection). */
+  hideInRecordings: boolean;
+  /** Toggle the hidden-in-recordings state (atomic flip in main). */
+  onHideInRecordingsToggle: () => void;
   /**
    * Fires on each grip-drag move. `screenX/Y` are the pointer's screen
    * coordinates; `offsetX/Y` are the pointer's offset from the bar's top-left at
@@ -114,6 +119,8 @@ export function FloatingToolbar({
   onSizeChange,
   vanishing,
   onVanishingToggle,
+  hideInRecordings,
+  onHideInRecordingsToggle,
   onGripDrag,
   onGripDragEnd,
   barRef,
@@ -376,6 +383,28 @@ export function FloatingToolbar({
           </Button>
         </TooltipTrigger>
         <TooltipContent shortcut={["C"]}>Clear all</TooltipContent>
+      </Tooltip>
+
+      <Separator orientation="vertical" />
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="transparent"
+            size="small"
+            iconOnly
+            className={
+              "!size-6" +
+              (hideInRecordings ? " !bg-orange-500/95 !text-white hover:!bg-orange-500" : "")
+            }
+            aria-pressed={hideInRecordings}
+            onClick={onHideInRecordingsToggle}
+            aria-label="Hidden in recordings"
+          >
+            <VideoOff className="size-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent shortcut={["⇧", "R"]}>Hidden in recordings</TooltipContent>
       </Tooltip>
 
       <Separator orientation="vertical" />
