@@ -95,6 +95,14 @@ async function createOverlayWindowForDisplay(display: Display): Promise<BrowserW
   logger.info("overlay", `Creating drawing overlay window for display ${display.id}`);
 
   const win = new BrowserWindow({
+    // Position at the target display up front — a later setBounds alone can be
+    // re-constrained by macOS (windows get nudged below the menu bar), leaving
+    // the overlay offset from its display.
+    x: display.bounds.x,
+    y: display.bounds.y,
+    width: display.bounds.width,
+    height: display.bounds.height,
+    enableLargerThanScreen: true,
     frame: false,
     transparent: true,
     backgroundColor: "#00000000",
@@ -159,6 +167,9 @@ async function syncOverlayWindows(): Promise<BrowserWindow[]> {
       } else {
         win.showInactive();
       }
+      // macOS can re-constrain the frame while showing (nudging it below the
+      // menu bar); re-fit after show so the overlay covers the whole display.
+      fitToDisplay(win, display);
       win.moveTop();
     }
   }
@@ -240,6 +251,9 @@ export async function setOverlayActive(
       } else {
         win.showInactive();
       }
+      // macOS can re-constrain the frame while showing (nudging it below the
+      // menu bar); re-fit after show so the overlay covers the whole display.
+      fitToDisplay(win, display);
       win.moveTop();
     }
 

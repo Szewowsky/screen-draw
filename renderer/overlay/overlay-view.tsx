@@ -473,6 +473,11 @@ export function OverlayView() {
     };
 
     const onPointerMove = (e: PointerEvent) => {
+      // Hovering over a non-active display's overlay makes it the active display
+      // (and focuses its window), so the first click is handled by a key window
+      // instead of being swallowed. The guard in selectThisDisplay prevents
+      // redundant IPC when this display is already active.
+      selectThisDisplay();
       const model = modelRef.current;
       if (model.drag) {
         applyModel(updateDrag(model, toPoint(e)));
