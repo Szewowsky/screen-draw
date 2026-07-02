@@ -2,6 +2,9 @@
 
 Standalone Electron app for drawing annotations directly on top of the screen.
 
+- Feature guide: [docs/features.md](docs/features.md)
+- Release history: [CHANGELOG.md](CHANGELOG.md)
+
 ## Run
 
 ```bash
