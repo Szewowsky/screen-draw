@@ -89,6 +89,16 @@ const SHORTCUT_ROWS: { label: string; keys: ReactNode }[] = [
       </span>
     ),
   },
+  { label: "Hide/show toolbar", keys: <Key>T</Key> },
+  {
+    label: "Reset toolbar position",
+    keys: (
+      <KeyGroup>
+        <Key>⇧</Key>
+        <Key>T</Key>
+      </KeyGroup>
+    ),
+  },
   { label: "Deselect / stop drawing", keys: <Key>Esc</Key> },
 ];
 

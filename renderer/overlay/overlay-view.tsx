@@ -210,6 +210,12 @@ export function OverlayView() {
   const pickerOpenRef = useRef(pickerOpen);
   pickerOpenRef.current = pickerOpen;
 
+  // Session-only toolbar visibility toggled by `T`. Not persisted: re-entering
+  // drawing mode always shows the toolbar again (reset by the active-changed
+  // effect below). Only gates the FloatingToolbar's rendering — drawing and
+  // keyboard shortcuts keep working while the toolbar is hidden.
+  const [hidden, setHidden] = useState(false);
+
   // Keep the latest tool settings available to the (stable) pointer handlers.
   const toolRef = useRef(tool);
   const colorRef = useRef(color);
@@ -433,6 +439,16 @@ export function OverlayView() {
     return () => unsub?.();
   }, []);
 
+  // Re-entering drawing mode always reveals the toolbar again: the `T` toggle is
+  // session-only. The overlay stays mounted while drawing is off (main hides the
+  // windows), so reset off the backend's active broadcast rather than remount.
+  useEffect(() => {
+    const unsub = window.screenDraw.ipc.on("overlay:active-changed", (params) => {
+      if ((params as { active?: boolean } | undefined)?.active) setHidden(false);
+    });
+    return () => unsub?.();
+  }, []);
+
   // Undo/redo arrive as backend broadcasts because ⌘Z / ⌘⇧Z are registered as
   // global shortcuts while drawing (the Edit menu would otherwise swallow them).
   useEffect(() => {
@@ -563,6 +579,23 @@ export function OverlayView() {
       }
 
       const key = e.key.toLowerCase();
+      // T toggles the toolbar for this session; Shift+T resets its position to
+      // the default and clears the persisted one. Handled before the tool-key
+      // lookup so Shift+T (which arrives as "T") isn't seen as a plain shortcut.
+      // Ignored while the color popover is open so the toolbar doesn't shift out
+      // from under the still-anchored popover.
+      if (key === "t") {
+        if (pickerOpenRef.current) return;
+        e.preventDefault();
+        if (e.shiftKey) {
+          setToolbarPos(null);
+          void window.screenDraw.ipc.invoke("settings:setDefaults", { toolbarPosition: null });
+        } else {
+          setHidden((h) => !h);
+        }
+        return;
+      }
+
       const toolForKey = TOOLS.find((t) => t.key.toLowerCase() === key);
       if (toolForKey) {
         e.preventDefault();
@@ -597,9 +630,10 @@ export function OverlayView() {
   }, [setupCanvas, applyModel, undo, redo, exit, clearAll, selectThisDisplay, changeTool]);
 
   const showToolbar =
-    displayIdRef.current === null ||
-    activeDisplayId === null ||
-    displayIdRef.current === activeDisplayId;
+    !hidden &&
+    (displayIdRef.current === null ||
+      activeDisplayId === null ||
+      displayIdRef.current === activeDisplayId);
 
   return (
     <div className="fixed inset-0 h-full w-full">
