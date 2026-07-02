@@ -210,6 +210,10 @@ export function OverlayView() {
   // in-progress shape painted on top.
   const committedLayerRef = useRef<{ canvas: HTMLCanvasElement; revision: number } | null>(null);
 
+  // Pending animation-frame id for a scheduled repaint (null = none in flight).
+  // Doubles as the coalescing flag and the cancel handle.
+  const rafRef = useRef<number | null>(null);
+
   const redraw = useCallback(() => {
     const ctx = ctxRef.current;
     const canvas = canvasRef.current;
@@ -263,11 +267,33 @@ export function OverlayView() {
     }
   }, []);
 
+  // Coalesce several triggers in one frame (pointer drag + broadcast + toolbar
+  // action) into a single clear+blit: set a pending frame if none is in flight,
+  // and paint from the CURRENT modelRef when it fires (last state of the frame
+  // wins). `redraw` captures no arguments, so the deferred paint always reflects
+  // the latest `modelRef.current`.
+  const scheduleRedraw = useCallback(() => {
+    if (rafRef.current !== null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      redraw();
+    });
+  }, [redraw]);
+
+  // Cancel a pending frame on unmount so the rAF callback never touches a
+  // detached canvas. Own effect (not the canvas effect's cleanup, which fires on
+  // every dep change) so it runs only on unmount.
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
   /** Store the next model state, repaint, and sync the toolbar's enabled states. */
   const applyModel = useCallback(
     (next: DrawingModel) => {
       modelRef.current = next;
-      redraw();
+      scheduleRedraw();
       // Mirror the selected shape's style to the toolbar (null when deselected).
       const selected = next.selectedIndex !== null ? next.shapes[next.selectedIndex] : null;
       setSelectionStyle((prev) => {
@@ -285,7 +311,7 @@ export function OverlayView() {
           : { canUndo, canRedo, hasShapes };
       });
     },
-    [redraw],
+    [scheduleRedraw],
   );
 
   const setupCanvas = useCallback(() => {
