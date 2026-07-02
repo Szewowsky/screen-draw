@@ -2,7 +2,7 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
-## [Unreleased]
+## 1.5.0 — 2026-07-02
 
 ### Changed
 - **Session ink** (`G`) redefined: while it's on, drawing now works *exactly* like normal — strokes commit to the canvas and are selectable (`V`), restylable, movable, deletable, and fully undoable/redoable with `⌘Z`. The toggle's only effect is on a **full exit** (`Esc` / **Stop drawing** / the global toggle): if session ink is on, the canvas and undo history reset to a clean slate, so the next drawing session starts fresh. Pinning (`S`) never wipes — pinned annotations stay. With session ink off, everything persists across hide/show as before. Previously session-ink strokes lived outside the model and couldn't be selected or restyled; this fixes that.
