@@ -2,6 +2,14 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
+## 1.6.2 — 2026-07-02
+
+### Added
+- **Autonomous activation-latency diagnostics.** `SCREEN_DRAW_LAT=1` enables `[LAT-161]` instrumentation, a file-trigger probe, and `scripts/lat-scenarios.sh` for the A–F latency matrix. The probe is inert in normal launches.
+
+### Changed
+- **No experimental activation fix shipped.** The packaged 1.6.1 candidate measured green/inconclusive across the full A–F matrix: no stage's p95 exceeded the panel-visible baseline by 50 ms. The H1–H4 experiment ladder was skipped; owner QA remains the real-shortcut feel test on a physical display.
+
 ## 1.6.1 — 2026-07-02
 
 ### Fixed

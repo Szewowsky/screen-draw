@@ -6,7 +6,7 @@ User-facing documentation for every feature. Release history lives in [CHANGELOG
 
 Toggle with the global shortcut (default **⌘⇧D**, configurable in the control panel), the control panel's button, or the tray menu. While active, transparent overlays cover every display and all input goes to Screen Draw; **Esc** exits (see Escape layering below).
 
-The overlay and toolbar stay ready while hidden, and the toolbar is shown before macOS app focus is requested. This keeps the app-side activation path short, but activation feel is still verified manually on a physical display: 1.6.1 has a known intermittent lag report after switching between apps.
+The overlay and toolbar stay ready while hidden, and the toolbar is shown before macOS app focus is requested. This keeps the app-side activation path short, but activation feel is still verified manually on a physical display: the 1.6.2 automated matrix was green/inconclusive, while owner real-shortcut QA remains the final check after switching between apps.
 
 **Multi-display:** each display has its own canvas — shapes belong to the display they were drawn on. Moving the cursor onto a display makes it active: the toolbar and keyboard shortcuts follow the pointer. Undo/redo apply to the active display.
 
