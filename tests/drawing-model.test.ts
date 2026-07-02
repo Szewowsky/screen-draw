@@ -7,6 +7,7 @@ import {
   commitShape,
   constrainPoint,
   createModel,
+  discardCurrent,
   getBounds,
   redo,
   startShape,
@@ -237,6 +238,37 @@ describe("committed-layer invalidation (revision)", () => {
     expect(redo(empty).revision).toBe(empty.revision);
     expect(clearAll(empty).revision).toBe(empty.revision);
     expect(commitShape(empty).revision).toBe(empty.revision);
+  });
+});
+
+describe("discardCurrent (vanishing ink)", () => {
+  it("drops the in-progress shape without committing it or touching history", () => {
+    let model = startShape(createModel(), PEN, { x: 1, y: 2 });
+    model = updateShape(model, { x: 3, y: 4 }, false);
+    const discarded = discardCurrent(model);
+    expect(discarded.current).toBeNull();
+    // The committed set, its cache revision, and undo/redo are all untouched.
+    expect(discarded.shapes).toEqual([]);
+    expect(discarded.revision).toBe(model.revision);
+    expect(discarded.undoStack).toBe(model.undoStack);
+    expect(discarded.redoStack).toBe(model.redoStack);
+  });
+
+  it("is a no-op when there is no in-progress shape", () => {
+    const empty = createModel();
+    expect(discardCurrent(empty)).toBe(empty);
+  });
+
+  it("leaves already-committed shapes and their undo history intact", () => {
+    const committed = drawStroke(createModel(), [
+      { x: 0, y: 0 },
+      { x: 5, y: 5 },
+    ]);
+    const withCurrent = startShape(committed, PEN, { x: 8, y: 8 });
+    const discarded = discardCurrent(withCurrent);
+    expect(discarded.shapes).toEqual(committed.shapes);
+    expect(discarded.undoStack).toBe(committed.undoStack);
+    expect(canUndo(discarded)).toBe(true);
   });
 });
 

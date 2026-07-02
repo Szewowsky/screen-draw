@@ -22,6 +22,7 @@ import {
   ArrowUpRight,
   Circle,
   Eraser,
+  Ghost,
   GripVertical,
   Highlighter,
   Minus,
@@ -54,6 +55,7 @@ import {
   commitShape,
   createModel,
   deleteSelected,
+  discardCurrent,
   draggedShape,
   endDrag,
   getBounds,
@@ -68,6 +70,7 @@ import {
   type Point,
   type Shape,
 } from "./drawing-model";
+import { addEphemeral, ephemeralAlpha, pruneEphemerals, type Ephemeral } from "./ephemeral";
 
 interface OverlayWindowState {
   activeDisplayId?: number | null;
@@ -124,7 +127,12 @@ function drawArrowHead(ctx: CanvasRenderingContext2D, from: Point, to: Point, si
   ctx.stroke();
 }
 
-function drawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
+/**
+ * Paint `shape` onto `ctx`. `alphaScale` (default 1) multiplies the tool's own
+ * opacity, so a fading ephemeral dims correctly for both the highlighter's 0.35
+ * band and the fully opaque tools.
+ */
+function drawShape(ctx: CanvasRenderingContext2D, shape: Shape, alphaScale = 1) {
   const { points: pts } = shape;
   if (pts.length === 0) return;
 
@@ -134,10 +142,10 @@ function drawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
   ctx.fillStyle = shape.color;
 
   if (shape.tool === "highlighter") {
-    ctx.globalAlpha = 0.35;
+    ctx.globalAlpha = 0.35 * alphaScale;
     ctx.lineWidth = shape.size * 5;
   } else {
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = alphaScale;
     ctx.lineWidth = shape.size;
   }
 
@@ -216,6 +224,14 @@ export function OverlayView() {
   // keyboard shortcuts keep working while the toolbar is hidden.
   const [hidden, setHidden] = useState(false);
 
+  // Vanishing ink (`G`). While ON, a finished stroke is not committed to the
+  // model/history — it joins the ephemeral list and fades out on its own. State
+  // for the toolbar's active styling; mirrored to a ref for the once-bound
+  // pointer handler. Sticky across re-activation (unlike `hidden`).
+  const [vanishing, setVanishing] = useState(false);
+  const vanishingRef = useRef(vanishing);
+  vanishingRef.current = vanishing;
+
   // Keep the latest tool settings available to the (stable) pointer handlers.
   const toolRef = useRef(tool);
   const colorRef = useRef(color);
@@ -223,6 +239,12 @@ export function OverlayView() {
   toolRef.current = tool;
   colorRef.current = color;
   sizeRef.current = size;
+
+  // Finished ephemeral shapes, held in a ref (never state) so the stable
+  // `redraw` and the long-lived rAF tick always read the live list. A single
+  // rAF loop (tracked in `rafRef`) runs only while the list is non-empty.
+  const ephemeralsRef = useRef<readonly Ephemeral[]>([]);
+  const rafRef = useRef<number | null>(null);
 
   // Committed shapes are rasterized once into this offscreen layer and
   // re-rasterized only when the committed set changes (model revision) or the
@@ -266,6 +288,16 @@ export function OverlayView() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(layer.canvas, 0, 0);
     ctx.restore();
+    // Vanishing-ink shapes render on top of the committed layer, dimming with
+    // age. Paint (never prune) here: an expired one draws at alpha 0 until the
+    // rAF tick removes it.
+    const ephemerals = ephemeralsRef.current;
+    if (ephemerals.length > 0) {
+      const now = performance.now();
+      for (const e of ephemerals) {
+        drawShape(ctx, e.shape, ephemeralAlpha(now - e.createdAt));
+      }
+    }
     if (model.current) {
       drawShape(ctx, model.current);
     }
@@ -299,6 +331,31 @@ export function OverlayView() {
     },
     [redraw],
   );
+
+  // Cancel the fade loop and forget any in-flight ephemerals. Used when clearing
+  // and when drawing mode deactivates — never on a plain vanishing-ink toggle.
+  // Repaints so a still-opaque ephemeral doesn't linger on the retained bitmap
+  // (the deactivate path has no other redraw; the clear path repaints anyway).
+  const clearEphemerals = useCallback(() => {
+    ephemeralsRef.current = [];
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    redraw();
+  }, [redraw]);
+
+  // Drive the fade: prune expired ephemerals, repaint, and keep animating only
+  // while any remain. No-ops if a loop is already running (single loop).
+  const startEphemeralLoop = useCallback(() => {
+    if (rafRef.current !== null) return;
+    const tick = () => {
+      ephemeralsRef.current = pruneEphemerals(ephemeralsRef.current, performance.now());
+      redraw();
+      rafRef.current = ephemeralsRef.current.length > 0 ? requestAnimationFrame(tick) : null;
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  }, [redraw]);
 
   const setupCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -337,8 +394,15 @@ export function OverlayView() {
   }, [applyModel]);
 
   const clearAll = useCallback(() => {
+    // Clear means clear: committed shapes and any fading vanishing ink both go.
+    clearEphemerals();
     applyModel(modelClearAll(modelRef.current));
-  }, [applyModel]);
+  }, [applyModel, clearEphemerals]);
+
+  const toggleVanishing = useCallback(() => {
+    // Toggling only flips the mode; in-flight ephemerals keep fading either way.
+    setVanishing((v) => !v);
+  }, []);
 
   const exit = useCallback(() => {
     void window.screenDraw.ipc.invoke("overlay:setActive", false);
@@ -442,12 +506,14 @@ export function OverlayView() {
   // Re-entering drawing mode always reveals the toolbar again: the `T` toggle is
   // session-only. The overlay stays mounted while drawing is off (main hides the
   // windows), so reset off the backend's active broadcast rather than remount.
+  // Deactivating also drops any in-flight vanishing ink from the prior session.
   useEffect(() => {
     const unsub = window.screenDraw.ipc.on("overlay:active-changed", (params) => {
       if ((params as { active?: boolean } | undefined)?.active) setHidden(false);
+      else clearEphemerals();
     });
     return () => unsub?.();
-  }, []);
+  }, [clearEphemerals]);
 
   // Undo/redo arrive as backend broadcasts because ⌘Z / ⌘⇧Z are registered as
   // global shortcuts while drawing (the Edit menu would otherwise swallow them).
@@ -523,6 +589,18 @@ export function OverlayView() {
       }
       if (!drawingRef.current) return;
       drawingRef.current = false;
+      if (vanishingRef.current && model.current) {
+        // Vanishing ink: the finished shape never enters the model/history — it
+        // becomes an ephemeral that fades and is pruned by the rAF loop.
+        ephemeralsRef.current = addEphemeral(
+          ephemeralsRef.current,
+          model.current,
+          performance.now(),
+        );
+        applyModel(discardCurrent(model));
+        startEphemeralLoop();
+        return;
+      }
       applyModel(commitShape(model));
     };
 
@@ -596,6 +674,15 @@ export function OverlayView() {
         return;
       }
 
+      // G toggles vanishing ink. Ignored while the color popover is open, for
+      // consistency with T.
+      if (key === "g") {
+        if (pickerOpenRef.current) return;
+        e.preventDefault();
+        toggleVanishing();
+        return;
+      }
+
       const toolForKey = TOOLS.find((t) => t.key.toLowerCase() === key);
       if (toolForKey) {
         e.preventDefault();
@@ -626,8 +713,21 @@ export function OverlayView() {
       canvas.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("resize", setupCanvas);
+      // Stop the fade loop so it can't outlive the component.
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [setupCanvas, applyModel, undo, redo, exit, clearAll, selectThisDisplay, changeTool]);
+  }, [
+    setupCanvas,
+    applyModel,
+    undo,
+    redo,
+    exit,
+    clearAll,
+    selectThisDisplay,
+    changeTool,
+    startEphemeralLoop,
+    toggleVanishing,
+  ]);
 
   const showToolbar =
     !hidden &&
@@ -655,6 +755,8 @@ export function OverlayView() {
           onPickerOpenChange={setPickerOpen}
           size={size}
           onSizeChange={setSize}
+          vanishing={vanishing}
+          onVanishingToggle={toggleVanishing}
           pos={toolbarPos}
           onPosChange={moveToolbar}
           onPosCommit={commitToolbarPos}
@@ -682,6 +784,8 @@ interface FloatingToolbarProps {
   onPickerOpenChange: (open: boolean) => void;
   size: number;
   onSizeChange: (size: number) => void;
+  vanishing: boolean;
+  onVanishingToggle: () => void;
   pos: ToolbarPosition | null;
   onPosChange: (pos: ToolbarPosition) => void;
   onPosCommit: (pos: ToolbarPosition) => void;
@@ -705,6 +809,8 @@ function FloatingToolbar({
   onPickerOpenChange,
   size,
   onSizeChange,
+  vanishing,
+  onVanishingToggle,
   pos,
   onPosChange,
   onPosCommit,
@@ -899,6 +1005,27 @@ function FloatingToolbar({
           </span>
         </TooltipTrigger>
         <TooltipContent shortcut={["[", "]"]}>Brush size</TooltipContent>
+      </Tooltip>
+
+      <Separator orientation="vertical" />
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="transparent"
+            size="small"
+            iconOnly
+            className={
+              "!size-6" + (vanishing ? " !bg-orange-500/95 !text-white hover:!bg-orange-500" : "")
+            }
+            aria-pressed={vanishing}
+            onClick={onVanishingToggle}
+            aria-label="Vanishing ink"
+          >
+            <Ghost className="size-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent shortcut={["G"]}>Vanishing ink</TooltipContent>
       </Tooltip>
 
       <Separator orientation="vertical" />

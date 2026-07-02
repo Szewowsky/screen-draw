@@ -129,6 +129,16 @@ function pushHistory(
   return next.length > HISTORY_LIMIT ? next.slice(next.length - HISTORY_LIMIT) : next;
 }
 
+/**
+ * Discard the in-progress shape without committing it. Used by vanishing ink,
+ * which pulls the finished shape into its own ephemeral list rather than the
+ * model. The committed set is untouched, so `revision` is left as-is (the cached
+ * committed layer stays valid) and undo/redo never see the discarded shape.
+ */
+export function discardCurrent(model: DrawingModel): DrawingModel {
+  return model.current ? { ...model, current: null } : model;
+}
+
 /** Commit the in-progress shape. A committed shape invalidates the redo stack. */
 export function commitShape(model: DrawingModel): DrawingModel {
   if (!model.current) return model;
