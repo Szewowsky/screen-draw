@@ -12,6 +12,7 @@ import { openSettingsWindow } from "./windows/settings-window.js";
 import { createOverlayWindow, toggleOverlay } from "./windows/overlay-window.js";
 import { getSettings } from "./services/settings-store.js";
 import { registerToggleShortcut } from "./services/shortcut.js";
+import { startLatencyTriggerWatcher } from "./services/latency-probe.js";
 import { logger } from "./logger.js";
 
 // Get directory paths
@@ -257,6 +258,13 @@ app.whenReady().then(async () => {
   if (process.platform === "darwin") {
     app.dock?.hide();
   }
+  startLatencyTriggerWatcher({
+    toggle: () => toggleOverlay({ triggerSource: "lat-trigger" }),
+    hideMain: () => {
+      mainWindow?.hide();
+    },
+    quit: () => app.quit(),
+  });
 
   await setupApplicationMenu();
   setupTray();

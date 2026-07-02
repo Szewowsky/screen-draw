@@ -72,6 +72,12 @@ interface RendererMarkPayload {
   activeToRaf2Ms?: unknown;
 }
 
+interface TriggerActions {
+  toggle: () => Promise<void>;
+  hideMain: () => void;
+  quit: () => void;
+}
+
 const stageNames: StageName[] = [
   "applyModeMs",
   "syncOverlayWindowsMs",
@@ -97,6 +103,10 @@ const stageNames: StageName[] = [
 let sequence = 0;
 let current: ActivationSession | null = null;
 let handlersRegistered = false;
+let triggerWatcher: fs.FSWatcher | null = null;
+let triggerOffset = 0;
+let triggerRemainder = "";
+let triggerQueue: Promise<void> = Promise.resolve();
 
 export function isLatencyProbeEnabled(): boolean {
   return process.env.SCREEN_DRAW_LAT === "1";
@@ -129,6 +139,10 @@ function windowLabel(win: BrowserWindow): string {
 
 function logPath(): string {
   return path.join(app.getPath("userData"), "latency.log");
+}
+
+function triggerPath(): string {
+  return path.join(app.getPath("userData"), "lat-trigger");
 }
 
 function setStage(session: ActivationSession, stage: StageName, value: number): void {
@@ -328,4 +342,60 @@ export function registerLatencyProbeHandlers(): void {
   app.on("browser-window-focus", (_event, win) => {
     recordBrowserWindowFocus(win);
   });
+}
+
+async function runTriggerCommand(command: string, actions: TriggerActions): Promise<void> {
+  if (command === "toggle") {
+    console.info(`${TAG} trigger command=toggle`);
+    await actions.toggle();
+    return;
+  }
+  if (command === "hide-main") {
+    console.info(`${TAG} trigger command=hide-main`);
+    actions.hideMain();
+    return;
+  }
+  if (command === "quit") {
+    console.info(`${TAG} trigger command=quit`);
+    actions.quit();
+    return;
+  }
+  console.error(`${TAG} unknown trigger command=${JSON.stringify(command)}`);
+}
+
+async function drainTriggerFile(filePath: string, actions: TriggerActions): Promise<void> {
+  const raw = fs.readFileSync(filePath, "utf-8");
+  if (raw.length < triggerOffset) {
+    triggerOffset = 0;
+    triggerRemainder = "";
+  }
+  if (raw.length === triggerOffset) return;
+
+  triggerRemainder += raw.slice(triggerOffset);
+  triggerOffset = raw.length;
+
+  const lines = triggerRemainder.split(/\r?\n/);
+  triggerRemainder = lines.pop() ?? "";
+  for (const line of lines) {
+    const command = line.trim();
+    if (command.length === 0) continue;
+    await runTriggerCommand(command, actions);
+  }
+}
+
+export function startLatencyTriggerWatcher(actions: TriggerActions): string | null {
+  if (!isLatencyProbeEnabled() || triggerWatcher) return null;
+  const filePath = triggerPath();
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, "", { flag: "a" });
+  triggerOffset = fs.readFileSync(filePath, "utf-8").length;
+  triggerWatcher = fs.watch(filePath, () => {
+    triggerQueue = triggerQueue
+      .then(() => drainTriggerFile(filePath, actions))
+      .catch((error: unknown) => {
+        console.error(`${TAG} trigger watcher error`, error);
+      });
+  });
+  console.info(`${TAG} trigger watcher active path=${filePath}`);
+  return filePath;
 }
