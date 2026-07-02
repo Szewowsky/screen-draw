@@ -100,6 +100,8 @@ interface FloatingToolbarProps {
   onGripDragEnd: () => void;
   /** Ref to the bar element, so the view can measure it to size the window. */
   barRef: RefObject<HTMLDivElement | null>;
+  /** Tooltip direction chosen by the toolbar window to keep popovers inside it. */
+  tooltipSide: "top" | "bottom";
   canUndo: boolean;
   onUndo: () => void;
   canRedo: boolean;
@@ -128,6 +130,7 @@ export function FloatingToolbar({
   onGripDrag,
   onGripDragEnd,
   barRef,
+  tooltipSide,
   canUndo,
   onUndo,
   canRedo,
@@ -191,7 +194,7 @@ export function FloatingToolbar({
             <GripVertical className="size-3.5" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Drag to move</TooltipContent>
+        <TooltipContent side={tooltipSide}>Drag to move</TooltipContent>
       </Tooltip>
 
       <Separator orientation="vertical" />
@@ -218,7 +221,9 @@ export function FloatingToolbar({
                 <Icon className="size-3.5" />
               </SegmentedControlItem>
             </TooltipTrigger>
-            <TooltipContent shortcut={[key]}>{label}</TooltipContent>
+            <TooltipContent side={tooltipSide} shortcut={[key]}>
+              {label}
+            </TooltipContent>
           </Tooltip>
         ))}
       </SegmentedControl>
@@ -247,7 +252,9 @@ export function FloatingToolbar({
                 <span className="size-3.5 rounded-full" style={{ backgroundColor: c.value }} />
               </SegmentedControlItem>
             </TooltipTrigger>
-            <TooltipContent shortcut={[String(i + 1)]}>{c.name}</TooltipContent>
+            <TooltipContent side={tooltipSide} shortcut={[String(i + 1)]}>
+              {c.name}
+            </TooltipContent>
           </Tooltip>
         ))}
         {customColors.map((c) => (
@@ -262,7 +269,7 @@ export function FloatingToolbar({
                 <span className="size-3.5 rounded-full" style={{ backgroundColor: c }} />
               </SegmentedControlItem>
             </TooltipTrigger>
-            <TooltipContent>Recent color</TooltipContent>
+            <TooltipContent side={tooltipSide}>Recent color</TooltipContent>
           </Tooltip>
         ))}
       </SegmentedControl>
@@ -280,7 +287,7 @@ export function FloatingToolbar({
             style={{ backgroundColor: color }}
           />
         </TooltipTrigger>
-        <TooltipContent>Custom color</TooltipContent>
+        <TooltipContent side={tooltipSide}>Custom color</TooltipContent>
       </Tooltip>
       {pickerOpen ? (
         <ColorPopover
@@ -312,7 +319,9 @@ export function FloatingToolbar({
             />
           </span>
         </TooltipTrigger>
-        <TooltipContent shortcut={["[", "]"]}>Brush size</TooltipContent>
+        <TooltipContent side={tooltipSide} shortcut={["[", "]"]}>
+          Brush size
+        </TooltipContent>
       </Tooltip>
 
       <Separator orientation="vertical" />
@@ -333,7 +342,9 @@ export function FloatingToolbar({
             <Ghost className="size-3.5" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent shortcut={["G"]}>Session ink</TooltipContent>
+        <TooltipContent side={tooltipSide} shortcut={["G"]}>
+          Session ink
+        </TooltipContent>
       </Tooltip>
 
       <Separator orientation="vertical" />
@@ -352,7 +363,9 @@ export function FloatingToolbar({
             <Undo2 className="size-3.5" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent shortcut={["⌘", "Z"]}>Undo</TooltipContent>
+        <TooltipContent side={tooltipSide} shortcut={["⌘", "Z"]}>
+          Undo
+        </TooltipContent>
       </Tooltip>
 
       <Tooltip>
@@ -369,7 +382,9 @@ export function FloatingToolbar({
             <Redo2 className="size-3.5" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent shortcut={["⌘", "⇧", "Z"]}>Redo</TooltipContent>
+        <TooltipContent side={tooltipSide} shortcut={["⌘", "⇧", "Z"]}>
+          Redo
+        </TooltipContent>
       </Tooltip>
 
       <Tooltip>
@@ -386,7 +401,9 @@ export function FloatingToolbar({
             <Eraser className="size-3.5" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent shortcut={["C"]}>Clear all</TooltipContent>
+        <TooltipContent side={tooltipSide} shortcut={["C"]}>
+          Clear all
+        </TooltipContent>
       </Tooltip>
 
       <Separator orientation="vertical" />
@@ -408,7 +425,9 @@ export function FloatingToolbar({
             <VideoOff className="size-3.5" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent shortcut={["⇧", "R"]}>Hidden in recordings</TooltipContent>
+        <TooltipContent side={tooltipSide} shortcut={["⇧", "R"]}>
+          Hidden in recordings
+        </TooltipContent>
       </Tooltip>
 
       <Tooltip>
@@ -424,7 +443,9 @@ export function FloatingToolbar({
             <Pin className="size-3.5" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent shortcut={["S"]}>Pin annotations</TooltipContent>
+        <TooltipContent side={tooltipSide} shortcut={["S"]}>
+          Pin annotations
+        </TooltipContent>
       </Tooltip>
 
       <Separator orientation="vertical" />
@@ -442,7 +463,9 @@ export function FloatingToolbar({
             <X className="size-3.5" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent shortcut={["Esc"]}>Stop drawing</TooltipContent>
+        <TooltipContent side={tooltipSide} shortcut={["Esc"]}>
+          Stop drawing
+        </TooltipContent>
       </Tooltip>
     </div>
   );

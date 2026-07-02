@@ -12,8 +12,8 @@
  * ResizeObserver and reports the desired geometry over `toolbar:setBounds`:
  * display-relative top-left plus content size, which main translates into
  * absolute coordinates within the active display's work area. Dragging the grip
- * and opening the color popover both re-report bounds — the popover renders
- * inside the window, which grows (up or down, whichever fits) to hold it.
+ * opening the color popover, and hover tooltips all re-use those bounds — the
+ * popover/tooltips render inside the window, which grows to hold them.
  */
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -63,6 +63,10 @@ const DEFAULT_BOTTOM_OFFSET = 88;
  * lands it inside the window; the extra transparent space is invisible.
  */
 const POPOVER_RESERVE = POPOVER_HEIGHT + POPOVER_GAP + POPOVER_MARGIN + 42;
+/** Transparent room for hover tooltips; otherwise the toolbar window clips them. */
+const TOOLTIP_RESERVE = 40;
+/** Side room for long hover tooltips on the first/last toolbar items. */
+const TOOLTIP_SIDE_RESERVE = 96;
 
 const FALLBACK_WORK_AREA: WorkArea = { x: 0, y: 0, width: 1440, height: 900 };
 
@@ -142,32 +146,42 @@ export function ToolbarView() {
 
     const { x: barX, y: barY } = resolveBarPos(width, height, wa);
 
-    if (pickerOpenRef.current) {
-      // Grow the window to reserve space for the popover. Grow UP when there is
-      // room above the bar within the work area, else grow DOWN. The bar keeps
-      // its screen position; only the window (and the transparent reserve) moves.
-      const growUp = barY >= POPOVER_RESERVE;
-      const winY = growUp ? barY - POPOVER_RESERVE : barY;
-      const winH = height + POPOVER_RESERVE;
+    const reserve = pickerOpenRef.current ? POPOVER_RESERVE : TOOLTIP_RESERVE;
+    const growUp = barY >= reserve;
+    const winW = width + TOOLTIP_SIDE_RESERVE * 2;
+    const winX = barX - TOOLTIP_SIDE_RESERVE;
+    if (reserve > 0) {
+      // Grow the window to reserve transparent space for popovers/tooltips.
+      // Grow UP when there is room above the bar within the work area, else grow
+      // DOWN. The bar keeps its screen position; only the transparent reserve
+      // area moves.
+      const winY = growUp ? barY - reserve : barY;
+      const winH = height + reserve;
       window.screenDraw.ipc.invoke("toolbar:setBounds", {
-        width,
+        width: winW,
         height: winH,
-        x: barX,
+        x: winX,
         y: winY,
       });
     } else {
-      window.screenDraw.ipc.invoke("toolbar:setBounds", { width, height, x: barX, y: barY });
+      window.screenDraw.ipc.invoke("toolbar:setBounds", {
+        width: winW,
+        height,
+        x: winX,
+        y: barY,
+      });
     }
   }, [resolveBarPos]);
 
   // Whether the bar should sit at the bottom (grow-up) or top (grow-down) of the
-  // window while the popover is open. Kept in state so the flex alignment
-  // re-renders. Closed: bottom-align is irrelevant (window == bar height).
+  // window while transparent reserve space is open for a tooltip/popover. Kept
+  // in state so the flex alignment and tooltip side re-render.
   const [growUp, setGrowUp] = useState(true);
   useLayoutEffect(() => {
     const { height } = barSizeRef.current;
     const { y: barY } = resolveBarPos(barSizeRef.current.width, height, workAreaRef.current);
-    setGrowUp(barY >= POPOVER_RESERVE);
+    const reserve = pickerOpen ? POPOVER_RESERVE : TOOLTIP_RESERVE;
+    setGrowUp(barY >= reserve);
   }, [pickerOpen, resolveBarPos]);
 
   // Apply an inbound state snapshot (from getState or the toolbar:state broadcast).
@@ -394,6 +408,7 @@ export function ToolbarView() {
           }}
           onGripDrag={onGripDrag}
           onGripDragEnd={onGripDragEnd}
+          tooltipSide={growUp ? "top" : "bottom"}
           canUndo={history.canUndo}
           onUndo={() => action({ type: "undo" })}
           canRedo={history.canRedo}

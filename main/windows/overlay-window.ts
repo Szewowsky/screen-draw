@@ -37,6 +37,7 @@ const overlayWindows = new Map<number, BrowserWindow>();
 let mode: OverlayMode = "hidden";
 let activeDisplayId: number | null = null;
 let displayListenersRegistered = false;
+let deferredOverlayFocusTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Undo/redo use ⌘Z / ⌘⇧Z, which macOS's Edit menu claims as key equivalents and
 // swallows before they ever reach the overlay's keydown handler. Registering them
@@ -129,6 +130,8 @@ async function createOverlayWindowForDisplay(display: Display): Promise<BrowserW
       preload: getPreloadPath(),
       contextIsolation: true,
       nodeIntegration: false,
+      // Keep the hidden activation surface warm when the control panel is not visible.
+      backgroundThrottling: false,
     },
   });
 
@@ -252,6 +255,24 @@ export function focusActiveOverlay(): void {
   if (win && !win.isDestroyed()) win.focus();
 }
 
+function cancelDeferredOverlayFocus(): void {
+  if (deferredOverlayFocusTimer === null) return;
+  clearTimeout(deferredOverlayFocusTimer);
+  deferredOverlayFocusTimer = null;
+}
+
+function deferActiveOverlayFocus(): void {
+  cancelDeferredOverlayFocus();
+  deferredOverlayFocusTimer = setTimeout(() => {
+    deferredOverlayFocusTimer = null;
+    if (mode !== "drawing" || activeDisplayId === null) return;
+    const win = overlayWindows.get(activeDisplayId);
+    if (!win || win.isDestroyed()) return;
+    app.focus({ steal: true });
+    win.focus();
+  }, 16);
+}
+
 export function getActiveDisplayId(): number | null {
   return activeDisplayId;
 }
@@ -301,22 +322,23 @@ async function enterDrawing(options: OverlayActivationOptions): Promise<void> {
     win.moveTop();
   }
 
+  // Re-entering drawing mode always reveals the toolbar (the `T` toggle is
+  // session-only). Raise it after the overlays so it stays clickable above
+  // them (same screen-saver level). Show it before focusing the app so the
+  // first visible activation cue is not gated on macOS app activation.
+  resetToolbarHidden();
+  showToolbarWindow(activeDisplayId);
+
   // The overlay is usually toggled via a global shortcut while another app is
   // frontmost. Without activating our app, macOS keeps keyboard focus on that
   // app — clicks still register (acceptFirstMouse) but keydown shortcuts don't
-  // reach the overlay. Steal focus so keyboard shortcuts work immediately.
-  app.focus({ steal: true });
-  overlayWindows.get(activeDisplayId)?.focus();
+  // reach the overlay. Defer stealing focus by one frame so the visible toolbar
+  // is not gated on macOS app activation while switching between apps.
   await registerDrawingShortcuts();
+  deferActiveOverlayFocus();
 
-  // Re-entering drawing mode always reveals the toolbar (the `T` toggle is
-  // session-only). Raise it after the overlays so it stays clickable above
-  // them (same screen-saver level).
-  resetToolbarHidden();
-  showToolbarWindow(activeDisplayId);
   // Keep keyboard focus on the active overlay: showing the toolbar must not
   // steal the focus that the overlay's single-key shortcuts depend on.
-  overlayWindows.get(activeDisplayId)?.focus();
 }
 
 /**
@@ -326,6 +348,7 @@ async function enterDrawing(options: OverlayActivationOptions): Promise<void> {
  * pinning never wipes; only a FULL exit with session ink ON resets the model.
  */
 function enterSticky(): void {
+  cancelDeferredOverlayFocus();
   unregisterDrawingShortcuts();
   hideToolbarWindow();
 
@@ -348,6 +371,7 @@ function enterSticky(): void {
 
 /** Full exit: hide everything and release the drawing shortcuts. */
 function enterHidden(): void {
+  cancelDeferredOverlayFocus();
   unregisterDrawingShortcuts();
   hideToolbarWindow();
   for (const win of overlayWindows.values()) {

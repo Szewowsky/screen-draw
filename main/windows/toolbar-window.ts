@@ -65,6 +65,9 @@ export async function createToolbarWindow(): Promise<BrowserWindow> {
       preload: getPreloadPath(),
       contextIsolation: true,
       nodeIntegration: false,
+      // The toolbar is the first visible activation cue; don't let hidden-window
+      // throttling cold-start it when the control panel is closed or behind apps.
+      backgroundThrottling: false,
     },
   });
 

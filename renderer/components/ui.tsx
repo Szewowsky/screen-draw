@@ -35,12 +35,20 @@ export function TooltipTrigger({ children }: { asChild?: boolean; children: Reac
 export function TooltipContent({
   children,
   shortcut,
+  side = "top",
 }: {
   children: ReactNode;
   shortcut?: string[];
+  side?: "top" | "bottom";
 }) {
   return (
-    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-zinc-950 px-2.5 py-1.5 text-xs font-medium text-zinc-100 shadow-xl group-hover/tooltip:block">
+    <span
+      className={clsx(
+        "pointer-events-none absolute left-1/2 z-50 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-zinc-950 px-2.5 py-1.5 text-xs font-medium text-zinc-100 shadow-xl group-hover/tooltip:block",
+        side === "top" && "bottom-full mb-2",
+        side === "bottom" && "top-full mt-2",
+      )}
+    >
       {children}
       {shortcut?.length ? <span className="ml-2 text-zinc-400">{shortcut.join(" ")}</span> : null}
     </span>

@@ -2,6 +2,14 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
+## 1.6.1 — 2026-07-02
+
+### Fixed
+- **Floating-toolbar tooltips are visible again.** Hovering toolbar controls shows the control name and shortcut (where available); the toolbar window now reserves transparent space so those labels are not clipped.
+
+### Changed
+- **Drawing activation latency mitigation.** The overlay and floating toolbar stay warm while hidden, and the toolbar is shown before macOS app focus is requested. This improves the measured app-side activation path, but owner QA still reports intermittent lag after switching windows, so this release does not claim the activation issue is fully fixed.
+
 ## 1.6.0 — 2026-07-02
 
 ### Changed
