@@ -2,6 +2,15 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
+## 1.6.0 — 2026-07-02
+
+### Changed
+- **Performance: lighter and smoother, no behavior changes.** A pass over the app to make the control panel open instantly, keep ink glassy-smooth during long strokes, and sip less battery — all user-visible behavior is unchanged; only speed, memory, and power differ.
+  - **Faster control-panel load.** Dropped TanStack Router and React Query from the control panel — every screen's data already arrives over IPC, so plain state handles it directly. The main-window chunk shrank from ~101 KB to ~8 KB (plus the router/query common chunks are gone entirely), so the panel opens noticeably quicker.
+  - **Thinned stroke points.** Pen and highlighter strokes now skip points closer than a minimum spacing (`MIN_POINT_DISTANCE`, 1.5 px) to the previous one, so a long, slow stroke no longer accumulates thousands of near-duplicate points. This ends the gradual stutter on long strokes and speeds up hit-testing; the committed stroke can end up to 1.5 px short of the exact pointer-up position, which is visually indistinguishable.
+  - **Frame-synced overlay repaints.** All repaint triggers (pointer drag, settings broadcasts, toolbar actions) now coalesce through a single `requestAnimationFrame`-scheduled paint, guaranteeing at most one full-screen repaint per frame instead of several — less wasted GPU fill-rate on Retina displays, with no added input latency.
+  - **Build tooling.** Enabled the React Compiler via Vite's Babel option and set `build.target` to `chrome150` (the Chromium bundled with Electron 43), so the renderer is compiled for the engine it actually runs on rather than older ones.
+
 ## 1.5.0 — 2026-07-02
 
 ### Changed
