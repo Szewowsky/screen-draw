@@ -42,6 +42,8 @@ import {
   Highlighter,
   Minus,
   MousePointer2,
+  PanelTop,
+  PanelTopDashed,
   Pencil,
   Pin,
   Redo2,
@@ -58,6 +60,7 @@ import {
   MIN_SIZE,
   PALETTE,
   isPaletteColor,
+  type BoardMode,
   type OverlayTool,
 } from "./constants";
 import { normalizeHexColor } from "./color";
@@ -88,6 +91,8 @@ interface FloatingToolbarProps {
   onSizeChange: (size: number) => void;
   vanishing: boolean;
   onVanishingToggle: () => void;
+  boardMode: BoardMode;
+  onBoardModeCycle: () => void;
   /** Pin the annotations: leave them on screen but click-through (sticky mode). */
   onPin: () => void;
   /** Whether the toolbar window is hidden from screen recordings (content protection). */
@@ -129,6 +134,8 @@ export function FloatingToolbar({
   onSizeChange,
   vanishing,
   onVanishingToggle,
+  boardMode,
+  onBoardModeCycle,
   onPin,
   hideInRecordings,
   onHideInRecordingsToggle,
@@ -145,6 +152,7 @@ export function FloatingToolbar({
   onExit,
 }: FloatingToolbarProps) {
   const dragging = useRef(false);
+  const BoardIcon = boardMode === "transparent" ? PanelTopDashed : PanelTop;
 
   const onGripDown = (e: ReactPointerEvent) => {
     // The grip drag moves the whole toolbar WINDOW. Capture where in the bar the
@@ -326,6 +334,32 @@ export function FloatingToolbar({
         </TooltipTrigger>
         <TooltipContent side={tooltipSide} shortcut={["[", "]"]}>
           Brush size
+        </TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="transparent"
+            size="small"
+            iconOnly
+            className={
+              "!size-6" +
+              (boardMode === "white"
+                ? " !bg-white !text-black hover:!bg-zinc-100"
+                : boardMode === "black"
+                  ? " !bg-black !text-white hover:!bg-zinc-900"
+                  : "")
+            }
+            aria-pressed={boardMode !== "transparent"}
+            onClick={onBoardModeCycle}
+            aria-label="Board mode"
+          >
+            <BoardIcon className="size-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side={tooltipSide} shortcut={["W"]}>
+          Board mode
         </TooltipContent>
       </Tooltip>
 

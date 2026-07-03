@@ -4,6 +4,7 @@ import {
   MIN_SIZE,
   PALETTE,
   isPaletteColor,
+  type BoardMode,
   type OverlayTool,
   type ScreenDrawSettings,
 } from "./constants";
@@ -111,6 +112,10 @@ const ERASER_CURSOR_SVG = encodeURIComponent(
 );
 const ERASER_CURSOR = `url("data:image/svg+xml,${ERASER_CURSOR_SVG}") ${ERASER_CURSOR_RADIUS} ${ERASER_CURSOR_RADIUS}, auto`;
 const TEXT_FONT_FAMILY = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+const BOARD_COLORS: Record<Exclude<BoardMode, "transparent">, string> = {
+  white: "#FFFFFF",
+  black: "#000000",
+};
 
 interface TextInputState {
   anchor: Point;
@@ -121,6 +126,12 @@ interface TextInputState {
 
 function textFont(fontPx: number): string {
   return `${fontPx}px ${TEXT_FONT_FAMILY}`;
+}
+
+function nextBoardMode(mode: BoardMode): BoardMode {
+  if (mode === "transparent") return "white";
+  if (mode === "white") return "black";
+  return "transparent";
 }
 
 function isOverlayTool(value: unknown): value is OverlayTool {
@@ -284,6 +295,7 @@ export function OverlayView() {
   const textInputStateRef = useRef<TextInputState | null>(null);
   const textInputElementRef = useRef<HTMLInputElement>(null);
   const textMeasureCacheRef = useRef<Map<string, { width: number; height: number }>>(new Map());
+  const boardModeRef = useRef<BoardMode>("transparent");
   // Whether this overlay is in interactive drawing mode. In sticky the windows
   // stay visible (and may still hold focus right after pinning), so the keydown
   // handler must early-out — otherwise `C`/`T`/⌘Z would act on the pinned ink.
@@ -294,6 +306,7 @@ export function OverlayView() {
   const [color, setColor] = useState(PALETTE[0].value);
   const [size, setSize] = useState(4);
   const [textInput, setTextInput] = useState<TextInputState | null>(null);
+  const [boardMode, setBoardMode] = useState<BoardMode>("transparent");
   const [recentColors, setRecentColors] = useState<string[]>([]);
   // Style (color/size) of the currently selected shape, or null when nothing is
   // selected. Published to the toolbar so it mirrors the selection; kept
@@ -391,6 +404,12 @@ export function OverlayView() {
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const boardColor =
+      boardModeRef.current === "transparent" ? null : BOARD_COLORS[boardModeRef.current];
+    if (boardColor) {
+      ctx.fillStyle = boardColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
     ctx.drawImage(layer.canvas, 0, 0);
     ctx.restore();
     for (const stroke of laserStrokesRef.current) {
@@ -494,6 +513,15 @@ export function OverlayView() {
     setTextInput(next);
   }, []);
 
+  const setBoardModeState = useCallback(
+    (next: BoardMode) => {
+      boardModeRef.current = next;
+      setBoardMode(next);
+      scheduleRedraw();
+    },
+    [scheduleRedraw],
+  );
+
   const changeTool = useCallback(
     (next: OverlayTool) => {
       setTool(next);
@@ -516,6 +544,10 @@ export function OverlayView() {
   const clearAll = useCallback(() => {
     applyModel(modelClearAll(modelRef.current));
   }, [applyModel]);
+
+  const cycleBoardMode = useCallback(() => {
+    setBoardModeState(nextBoardMode(boardModeRef.current));
+  }, [setBoardModeState]);
 
   const cancelTextInput = useCallback(() => {
     setTextInputState(null);
@@ -702,9 +734,10 @@ export function OverlayView() {
       if (p.active) return;
       if (p.sticky) cancelInteraction();
       else if (vanishingRef.current) applyModel(createModel());
+      if (!p.sticky) setBoardModeState("transparent");
     });
     return () => unsub?.();
-  }, [applyModel, cancelInteraction]);
+  }, [applyModel, cancelInteraction, setBoardModeState]);
 
   // Publish this overlay's full toolbar-facing state to the toolbar window
   // (relayed via main) whenever it changes AND this display is active. The
@@ -722,6 +755,7 @@ export function OverlayView() {
       canRedo: historyState.canRedo,
       hasShapes: historyState.hasShapes,
       vanishing,
+      boardMode,
     });
   }, [
     tool,
@@ -731,6 +765,7 @@ export function OverlayView() {
     recentColors,
     historyState,
     vanishing,
+    boardMode,
     isThisActiveDisplay,
   ]);
 
@@ -855,6 +890,9 @@ export function OverlayView() {
         case "toggleVanishing":
           requestVanishingToggle();
           break;
+        case "cycleBoardMode":
+          cycleBoardMode();
+          break;
       }
     });
     return () => unsub();
@@ -868,6 +906,7 @@ export function OverlayView() {
     clearAll,
     exit,
     requestVanishingToggle,
+    cycleBoardMode,
   ]);
 
   // Canvas setup + pointer + keyboard handlers.
@@ -1061,6 +1100,12 @@ export function OverlayView() {
         return;
       }
 
+      if (key === "w") {
+        e.preventDefault();
+        cycleBoardMode();
+        return;
+      }
+
       const toolForKey = TOOL_KEYS[key];
       if (toolForKey) {
         e.preventDefault();
@@ -1122,6 +1167,7 @@ export function OverlayView() {
     finishLaserStroke,
     setTextInputState,
     measureTextForCanvas,
+    cycleBoardMode,
   ]);
 
   return (

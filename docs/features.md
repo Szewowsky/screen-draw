@@ -51,6 +51,12 @@ The **Toolbar on other displays** setting controls the session-ink scope. **Same
 
 Made for live streams and tutorials: annotate freely during a segment, then just stop drawing to wipe the slate before the next one — no manual clearing, and everything stays editable while you work.
 
+## Board mode — `W`
+
+Press `W` or the board button to cycle the active display through transparent, whiteboard, blackboard, and back to transparent. The board is a session-only overlay background, not a shape: it is not undoable/selectable, and `C` clears annotations without changing the board.
+
+Board mode is per display and resets to transparent on a full exit. Pinning while a board is active leaves the opaque board visible as a click-through sheet; resume drawing or press `W` again to change it.
+
 ## Undo / redo / clear
 
 - **⌘Z** undo, **⌘⇧Z** redo — work globally while drawing (registered as system-wide shortcuts). Moves, deletes, and clear-all are undoable; history holds the last 100 operations per display.

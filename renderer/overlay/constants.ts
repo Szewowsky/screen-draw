@@ -40,17 +40,12 @@ export const COLOR_PRESETS: string[] = [
 export const MIN_SIZE = 1;
 export const MAX_SIZE = 24;
 
-export type DrawTool =
-  | "pen"
-  | "highlighter"
-  | "line"
-  | "arrow"
-  | "rectangle"
-  | "ellipse"
-  | "text";
+export type DrawTool = "pen" | "highlighter" | "line" | "arrow" | "rectangle" | "ellipse" | "text";
 
 /** Tools available in the overlay toolbar: drawing tools plus the select tool. */
 export type OverlayTool = DrawTool | "select" | "laser" | "eraser";
+
+export type BoardMode = "transparent" | "white" | "black";
 
 export interface ToolbarPosition {
   x: number;

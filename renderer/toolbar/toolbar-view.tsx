@@ -23,7 +23,7 @@ import {
   POPOVER_GAP,
   POPOVER_MARGIN,
 } from "../overlay/floating-toolbar";
-import { PALETTE, isPaletteColor, type OverlayTool } from "../overlay/constants";
+import { PALETTE, isPaletteColor, type BoardMode, type OverlayTool } from "../overlay/constants";
 import type { ScreenDrawSettings, ToolbarPosition } from "../overlay/constants";
 import {
   clampToolbarPosition,
@@ -49,6 +49,7 @@ interface ToolbarState {
   canRedo: boolean;
   hasShapes: boolean;
   vanishing: boolean;
+  boardMode: BoardMode;
   activeDisplayId: number | null;
   workArea: WorkArea;
 }
@@ -145,6 +146,7 @@ export function ToolbarView() {
     hasShapes: false,
   });
   const [vanishing, setVanishing] = useState(false);
+  const [boardMode, setBoardMode] = useState<BoardMode>("transparent");
   const [hideInRecordings, setHideInRecordings] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -279,6 +281,13 @@ export function ToolbarView() {
       }
       if (Array.isArray(raw.recentColors)) setRecentColors(raw.recentColors);
       if (typeof raw.vanishing === "boolean") setVanishing(raw.vanishing);
+      if (
+        raw.boardMode === "transparent" ||
+        raw.boardMode === "white" ||
+        raw.boardMode === "black"
+      ) {
+        setBoardMode(raw.boardMode);
+      }
       setHistory({
         canUndo: raw.canUndo === true,
         canRedo: raw.canRedo === true,
@@ -467,6 +476,8 @@ export function ToolbarView() {
             setVanishing((v) => !v);
             action({ type: "toggleVanishing" });
           }}
+          boardMode={boardMode}
+          onBoardModeCycle={() => action({ type: "cycleBoardMode" })}
           onPin={() => action({ type: "pin" })}
           hideInRecordings={hideInRecordings}
           onHideInRecordingsToggle={() => {

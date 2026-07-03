@@ -92,6 +92,7 @@ const SHORTCUT_ROWS: { label: string; keys: ReactNode }[] = [
     ),
   },
   { label: "Session ink", keys: <Key>G</Key> },
+  { label: "Board mode", keys: <Key>W</Key> },
   { label: "Pin annotations", keys: <Key>S</Key> },
   { label: "Hide/show toolbar", keys: <Key>T</Key> },
   {
