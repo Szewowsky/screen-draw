@@ -20,7 +20,11 @@
 import { BrowserWindow, screen, type Display } from "electron";
 import { getPreloadPath, getWindowUrl } from "./window-paths.js";
 import { getSettings } from "../services/settings-store.js";
-import { measureLatencyStage, measureWindowOperation } from "../services/latency-probe.js";
+import {
+  measureLatencyStage,
+  measureWindowOperation,
+  recordToolbarCrossedDisplays,
+} from "../services/latency-probe.js";
 import { logger } from "../logger.js";
 
 let toolbarWindow: BrowserWindow | null = null;
@@ -28,6 +32,8 @@ let toolbarWindow: BrowserWindow | null = null;
 let userHidden = false;
 /** Latest content size reported by the renderer, kept so active-display moves can re-place. */
 let lastBounds: { width: number; height: number; x: number; y: number } | null = null;
+/** Last display the toolbar was intentionally shown or placed on. */
+let lastToolbarDisplayId: number | null = null;
 
 function getDisplayById(displayId: number): Display | undefined {
   return screen.getAllDisplays().find((display) => display.id === displayId);
@@ -117,6 +123,7 @@ export function setToolbarBounds(
   measureWindowOperation("toolbar", activeDisplayId, "setBounds", "toolbarSetBoundsMs", () =>
     win.setBounds({ x, y, width, height }),
   );
+  if (activeDisplayId !== null) lastToolbarDisplayId = activeDisplayId;
 }
 
 /** Whether the toolbar should currently be visible (drawing on and not user-hidden). */
@@ -128,8 +135,17 @@ export function showToolbarWindow(activeDisplayId: number | null): void {
       win.hide();
       return;
     }
-    measureWindowOperation("toolbar", activeDisplayId, "showInactive", "toolbarShowInactiveMs", () =>
-      win.showInactive(),
+    recordToolbarCrossedDisplays(
+      lastToolbarDisplayId !== null &&
+        activeDisplayId !== null &&
+        lastToolbarDisplayId !== activeDisplayId,
+    );
+    measureWindowOperation(
+      "toolbar",
+      activeDisplayId,
+      "showInactive",
+      "toolbarShowInactiveMs",
+      () => win.showInactive(),
     );
     // Same screen-saver level as the overlays, which call moveTop on show; raise
     // the toolbar afterwards so it stays clickable above them.
@@ -151,6 +167,7 @@ export function showToolbarWindow(activeDisplayId: number | null): void {
         win.setBounds({ x, y, width: bounds.width, height: bounds.height }),
       );
     }
+    if (activeDisplayId !== null) lastToolbarDisplayId = activeDisplayId;
   });
 }
 

@@ -2,6 +2,12 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
+## 1.6.3 — 2026-07-03
+
+### Added
+- **Toolbar position scope.** The control panel now lets the toolbar use the same saved position on every display (the default, matching previous releases) or remember a separate position per display. In per-display mode, dragging stores the active display's toolbar position and `Shift+T` resets only that display's saved position.
+- **Cross-display LAT-161 fields.** `SCREEN_DRAW_LAT=1` activation lines now include `toolbarCrossedDisplays` and a top-level `toolbarSetBoundsMs` value for the H10 toolbar-move probe; normal launches remain silent.
+
 ## 1.6.2 — 2026-07-02
 
 ### Added

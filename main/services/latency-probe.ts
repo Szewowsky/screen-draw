@@ -50,6 +50,7 @@ interface ActivationSession {
   fromMode: string;
   toMode: string;
   activeDisplayId: number | null;
+  toolbarCrossedDisplays: boolean;
   startedAt: number;
   startedAtIso: string;
   stages: Stages;
@@ -190,6 +191,8 @@ function finalizeActivation(reason: "complete" | "timeout" | "superseded"): void
     fromMode: current.fromMode,
     toMode: current.toMode,
     activeDisplayId: current.activeDisplayId,
+    toolbarCrossedDisplays: current.toolbarCrossedDisplays,
+    toolbarSetBoundsMs: current.stages.toolbarSetBoundsMs,
     startedAt: current.startedAtIso,
     totalMs: round(now() - current.startedAt),
     stages: current.stages,
@@ -217,6 +220,7 @@ export function beginLatencyActivation(
     fromMode: metadata.fromMode,
     toMode: metadata.toMode,
     activeDisplayId: null,
+    toolbarCrossedDisplays: false,
     startedAt: now(),
     startedAtIso: new Date().toISOString(),
     stages: blankStages(),
@@ -232,6 +236,11 @@ export function beginLatencyActivation(
 export function updateLatencyActivation(metadata: { activeDisplayId?: number | null }): void {
   if (!isLatencyProbeEnabled() || !current || current.finalized) return;
   if ("activeDisplayId" in metadata) current.activeDisplayId = metadata.activeDisplayId ?? null;
+}
+
+export function recordToolbarCrossedDisplays(crossedDisplays: boolean): void {
+  if (!isLatencyProbeEnabled() || !current || current.finalized) return;
+  current.toolbarCrossedDisplays = current.toolbarCrossedDisplays || crossedDisplays;
 }
 
 export function latencyActivationPayload(): {
@@ -307,10 +316,7 @@ export function recordRendererMark(raw: unknown): void {
   const payload = (raw ?? {}) as RendererMarkPayload;
   if (payload.latencyActivationId !== current.id) return;
   if (payload.source !== "overlay" && payload.source !== "toolbar") return;
-  if (
-    typeof payload.activeToRaf1Ms !== "number" ||
-    typeof payload.activeToRaf2Ms !== "number"
-  ) {
+  if (typeof payload.activeToRaf1Ms !== "number" || typeof payload.activeToRaf2Ms !== "number") {
     return;
   }
 

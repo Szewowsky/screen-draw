@@ -18,8 +18,37 @@ describe("coerceSettings", () => {
     expect(coerceSettings(legacy)).toEqual({
       ...legacy,
       toolbarPosition: null,
+      toolbarPositionScope: "shared",
+      toolbarPositionByDisplay: {},
       recentColors: [],
       hideToolbarInRecordings: false,
+    });
+  });
+
+  it("defaults legacy toolbar position scope to shared", () => {
+    expect(coerceSettings({ toolbarPosition: { x: 12, y: 24 } }).toolbarPositionScope).toBe(
+      "shared",
+    );
+  });
+
+  it("coerces unknown toolbar position scopes to shared", () => {
+    for (const raw of ["display", "global", true, null, 1, {}, []]) {
+      expect(coerceSettings({ toolbarPositionScope: raw }).toolbarPositionScope).toBe("shared");
+    }
+  });
+
+  it("round-trips per-display toolbar positions", () => {
+    const result = coerceSettings({
+      toolbarPositionScope: "per-display",
+      toolbarPositionByDisplay: {
+        "1": { x: 120, y: 40 },
+        "2": { x: 320, y: 80 },
+      },
+    });
+    expect(result.toolbarPositionScope).toBe("per-display");
+    expect(result.toolbarPositionByDisplay).toEqual({
+      "1": { x: 120, y: 40 },
+      "2": { x: 320, y: 80 },
     });
   });
 
@@ -47,6 +76,10 @@ describe("coerceSettings", () => {
       defaultColor: "",
       defaultSize: -3,
       toolbarPosition: { x: "left", y: 10 },
+      toolbarPositionScope: "mystery",
+      toolbarPositionByDisplay: {
+        "1": { x: "left", y: 20 },
+      },
       recentColors: "red",
     });
     expect(result).toEqual(DEFAULT_SETTINGS);

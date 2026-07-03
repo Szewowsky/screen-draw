@@ -11,6 +11,9 @@ export interface ToolbarPosition {
   y: number;
 }
 
+export type ToolbarPositionScope = "shared" | "per-display";
+export type ToolbarPositionByDisplay = Record<string, ToolbarPosition>;
+
 export interface ScreenDrawSettings {
   /** Global accelerator that toggles drawing mode, e.g. "Command+Shift+D". */
   shortcut: string;
@@ -20,6 +23,10 @@ export interface ScreenDrawSettings {
   defaultSize: number;
   /** Last dragged position of the floating toolbar; null = default placement. */
   toolbarPosition: ToolbarPosition | null;
+  /** Whether toolbar position is shared across displays or remembered per display. */
+  toolbarPositionScope: ToolbarPositionScope;
+  /** Display-id keyed toolbar positions used when toolbarPositionScope is per-display. */
+  toolbarPositionByDisplay: ToolbarPositionByDisplay;
   /** Recently picked custom colors, most recent first. */
   recentColors: string[];
   /** When true, the toolbar window is hidden from screen recordings (content protection). */
@@ -31,6 +38,8 @@ export const DEFAULT_SETTINGS: ScreenDrawSettings = {
   defaultColor: "#FF3B30",
   defaultSize: 4,
   toolbarPosition: null,
+  toolbarPositionScope: "shared",
+  toolbarPositionByDisplay: {},
   recentColors: [],
   hideToolbarInRecordings: false,
 };
@@ -46,6 +55,20 @@ function coerceToolbarPosition(raw: unknown): ToolbarPosition | null {
   if (typeof x !== "number" || !Number.isFinite(x)) return null;
   if (typeof y !== "number" || !Number.isFinite(y)) return null;
   return { x, y };
+}
+
+function coerceToolbarPositionScope(raw: unknown): ToolbarPositionScope {
+  return raw === "per-display" ? "per-display" : "shared";
+}
+
+function coerceToolbarPositionByDisplay(raw: unknown): ToolbarPositionByDisplay {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return {};
+  const positions: ToolbarPositionByDisplay = {};
+  for (const [displayId, value] of Object.entries(raw)) {
+    const position = coerceToolbarPosition(value);
+    if (displayId.trim() && position) positions[displayId] = position;
+  }
+  return positions;
 }
 
 function coerceRecentColors(raw: unknown): string[] {
@@ -79,6 +102,8 @@ export function coerceSettings(raw: unknown): ScreenDrawSettings {
         ? value.defaultSize
         : DEFAULT_SETTINGS.defaultSize,
     toolbarPosition: coerceToolbarPosition(value.toolbarPosition),
+    toolbarPositionScope: coerceToolbarPositionScope(value.toolbarPositionScope),
+    toolbarPositionByDisplay: coerceToolbarPositionByDisplay(value.toolbarPositionByDisplay),
     recentColors: coerceRecentColors(value.recentColors),
     hideToolbarInRecordings: value.hideToolbarInRecordings === true,
   };

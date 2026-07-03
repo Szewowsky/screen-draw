@@ -39,8 +39,13 @@ import {
 let cachedState: Record<string, unknown> = {};
 
 function withWorkArea(state: Record<string, unknown>): Record<string, unknown> {
-  const wa = getActiveWorkArea(getActiveDisplayId());
-  return { ...state, workArea: { x: wa.x, y: wa.y, width: wa.width, height: wa.height } };
+  const activeDisplayId = getActiveDisplayId();
+  const wa = getActiveWorkArea(activeDisplayId);
+  return {
+    ...state,
+    activeDisplayId,
+    workArea: { x: wa.x, y: wa.y, width: wa.width, height: wa.height },
+  };
 }
 
 export function registerToolbarHandlers(): void {

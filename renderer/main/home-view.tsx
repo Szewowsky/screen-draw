@@ -190,7 +190,12 @@ export function HomeView() {
   }, []);
 
   const applyDefaults = useCallback(
-    (partial: { defaultColor?: string; defaultSize?: number; recentColor?: string }) => {
+    (partial: {
+      defaultColor?: string;
+      defaultSize?: number;
+      recentColor?: string;
+      toolbarPositionScope?: ScreenDrawSettings["toolbarPositionScope"];
+    }) => {
       void window.screenDraw.ipc
         .invoke<ScreenDrawSettings>("settings:setDefaults", partial)
         .then((next) => setSettings(next));
@@ -249,6 +254,7 @@ export function HomeView() {
   const color = settings?.defaultColor ?? PALETTE[0].value;
   const brushSize = settings?.defaultSize ?? 4;
   const recentColors = (settings?.recentColors ?? []).filter((c) => !isPaletteColor(c));
+  const toolbarPositionScope = settings?.toolbarPositionScope ?? "shared";
 
   return (
     <ScrollArea
@@ -367,6 +373,36 @@ export function HomeView() {
               endContent={(v) => <span className="tabular-nums">{v}</span>}
               aria-label="Default brush size"
             />
+          </Field>
+        </FieldSet>
+
+        <FieldSet
+          title="Toolbar"
+          description="Choose how the floating toolbar is placed when drawing moves between displays."
+        >
+          <Field label="Toolbar on other displays" orientation="vertical">
+            <SegmentedControl
+              type="single"
+              size="small"
+              value={toolbarPositionScope}
+              onValueChange={(value) => {
+                if (value === "shared" || value === "per-display") {
+                  applyDefaults({ toolbarPositionScope: value });
+                }
+              }}
+              className="w-full"
+              aria-label="Toolbar position on other displays"
+            >
+              <SegmentedControlItem value="shared" className="flex-1 text-center leading-tight">
+                Same position as primary
+              </SegmentedControlItem>
+              <SegmentedControlItem
+                value="per-display"
+                className="flex-1 text-center leading-tight"
+              >
+                Remembered per display
+              </SegmentedControlItem>
+            </SegmentedControl>
           </Field>
         </FieldSet>
 

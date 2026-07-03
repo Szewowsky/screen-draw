@@ -17,9 +17,16 @@ import {
   coerceSettings,
   type ScreenDrawSettings,
   type ToolbarPosition,
+  type ToolbarPositionByDisplay,
+  type ToolbarPositionScope,
 } from "./settings-schema.js";
 
-export type { ScreenDrawSettings, ToolbarPosition } from "./settings-schema.js";
+export type {
+  ScreenDrawSettings,
+  ToolbarPosition,
+  ToolbarPositionByDisplay,
+  ToolbarPositionScope,
+} from "./settings-schema.js";
 
 function settingsFilePath(): string {
   return path.join(app.getPath("userData"), "screen-draw-settings.json");
@@ -71,6 +78,10 @@ export function setDefaults(partial: {
   defaultSize?: number;
   /** null resets the toolbar to its default placement; undefined leaves it unchanged. */
   toolbarPosition?: ToolbarPosition | null;
+  /** Active display for a toolbar position write; per-display mode updates this entry. */
+  toolbarPositionDisplayId?: number | null;
+  /** How toolbar positions are remembered across displays. */
+  toolbarPositionScope?: ToolbarPositionScope;
   /** A custom color to record in the recent list (does not change the default color). */
   recentColor?: string;
   /** Toggle hiding the toolbar window from screen recordings; undefined leaves it unchanged. */
@@ -90,7 +101,24 @@ export function setDefaults(partial: {
       defaultColor: partial.defaultColor ?? current.defaultColor,
       defaultSize: partial.defaultSize ?? current.defaultSize,
       toolbarPosition:
-        partial.toolbarPosition !== undefined ? partial.toolbarPosition : current.toolbarPosition,
+        partial.toolbarPosition !== undefined &&
+        (current.toolbarPositionScope === "shared" ||
+          partial.toolbarPositionDisplayId === undefined ||
+          partial.toolbarPositionDisplayId === null)
+          ? partial.toolbarPosition
+          : current.toolbarPosition,
+      toolbarPositionScope: partial.toolbarPositionScope ?? current.toolbarPositionScope,
+      toolbarPositionByDisplay:
+        partial.toolbarPosition !== undefined &&
+        current.toolbarPositionScope === "per-display" &&
+        partial.toolbarPositionDisplayId !== undefined &&
+        partial.toolbarPositionDisplayId !== null
+          ? updateToolbarPositionByDisplay(
+              current.toolbarPositionByDisplay,
+              partial.toolbarPositionDisplayId,
+              partial.toolbarPosition,
+            )
+          : current.toolbarPositionByDisplay,
       recentColors: partial.recentColor
         ? addRecentColor(current.recentColors, partial.recentColor)
         : current.recentColors,
@@ -98,4 +126,16 @@ export function setDefaults(partial: {
     }),
   );
   return getSettings();
+}
+
+function updateToolbarPositionByDisplay(
+  current: ToolbarPositionByDisplay,
+  displayId: number,
+  position: ToolbarPosition | null,
+): ToolbarPositionByDisplay {
+  const next = { ...current };
+  const key = String(displayId);
+  if (position === null) delete next[key];
+  else next[key] = position;
+  return next;
 }

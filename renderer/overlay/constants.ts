@@ -50,12 +50,19 @@ export interface ToolbarPosition {
   y: number;
 }
 
+export type ToolbarPositionScope = "shared" | "per-display";
+export type ToolbarPositionByDisplay = Record<string, ToolbarPosition>;
+
 export interface ScreenDrawSettings {
   shortcut: string;
   defaultColor: string;
   defaultSize: number;
   /** Last dragged position of the floating toolbar; null = default placement. */
   toolbarPosition: ToolbarPosition | null;
+  /** Whether toolbar position is shared across displays or remembered per display. */
+  toolbarPositionScope: ToolbarPositionScope;
+  /** Display-id keyed toolbar positions used when toolbarPositionScope is per-display. */
+  toolbarPositionByDisplay: ToolbarPositionByDisplay;
   /** Recently picked custom colors, most recent first. */
   recentColors: string[];
   /** When true, the toolbar window is hidden from screen recordings. */

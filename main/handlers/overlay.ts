@@ -92,20 +92,27 @@ export function registerOverlayHandlers(): void {
         defaultColor?: unknown;
         defaultSize?: unknown;
         toolbarPosition?: unknown;
+        toolbarPositionScope?: unknown;
         recentColor?: unknown;
         hideToolbarInRecordings?: unknown;
         toggleHideToolbarInRecordings?: unknown;
       };
       const position = input.toolbarPosition as { x?: unknown; y?: unknown } | null | undefined;
+      const toolbarPosition =
+        position === null
+          ? null
+          : typeof position?.x === "number" && typeof position?.y === "number"
+            ? { x: position.x, y: position.y }
+            : undefined;
       const next = setDefaults({
         defaultColor: typeof input.defaultColor === "string" ? input.defaultColor : undefined,
         defaultSize: typeof input.defaultSize === "number" ? input.defaultSize : undefined,
-        toolbarPosition:
-          position === null
-            ? null
-            : typeof position?.x === "number" && typeof position?.y === "number"
-              ? { x: position.x, y: position.y }
-              : undefined,
+        toolbarPosition,
+        toolbarPositionDisplayId: toolbarPosition !== undefined ? getActiveDisplayId() : undefined,
+        toolbarPositionScope:
+          input.toolbarPositionScope === "shared" || input.toolbarPositionScope === "per-display"
+            ? input.toolbarPositionScope
+            : undefined,
         recentColor: typeof input.recentColor === "string" ? input.recentColor : undefined,
         hideToolbarInRecordings:
           typeof input.hideToolbarInRecordings === "boolean"

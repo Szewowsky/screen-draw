@@ -24,6 +24,7 @@ import {
   POPOVER_MARGIN,
 } from "../overlay/floating-toolbar";
 import { PALETTE, isPaletteColor, type OverlayTool } from "../overlay/constants";
+import type { ScreenDrawSettings, ToolbarPosition } from "../overlay/constants";
 import {
   clampToolbarPosition,
   sanitizeToolbarPosition,
@@ -48,7 +49,7 @@ interface ToolbarState {
   canRedo: boolean;
   hasShapes: boolean;
   vanishing: boolean;
-  toolbarPosition: { x: number; y: number } | null;
+  activeDisplayId: number | null;
   workArea: WorkArea;
 }
 
@@ -78,6 +79,24 @@ const FALLBACK_WORK_AREA: WorkArea = { x: 0, y: 0, width: 1440, height: 900 };
 
 function isToolbarState(value: unknown): value is Partial<ToolbarState> {
   return typeof value === "object" && value !== null;
+}
+
+function isToolbarPosition(value: unknown): value is ToolbarPosition {
+  if (typeof value !== "object" || value === null) return false;
+  const { x, y } = value as Partial<Record<"x" | "y", unknown>>;
+  return typeof x === "number" && Number.isFinite(x) && typeof y === "number" && Number.isFinite(y);
+}
+
+function selectToolbarPositionForDisplay(
+  settings: Partial<ScreenDrawSettings>,
+  activeDisplayId: number | null,
+): ToolbarPosition | null {
+  if (settings.toolbarPositionScope === "per-display") {
+    if (activeDisplayId === null) return null;
+    const position = settings.toolbarPositionByDisplay?.[String(activeDisplayId)];
+    return isToolbarPosition(position) ? position : null;
+  }
+  return isToolbarPosition(settings.toolbarPosition) ? settings.toolbarPosition : null;
 }
 
 function markLatencyActivation(params: OverlayActiveChanged): void {
@@ -131,6 +150,8 @@ export function ToolbarView() {
 
   // Display-relative desired top-left of the bar; null = default bottom-center.
   const posRef = useRef<{ x: number; y: number } | null>(null);
+  const settingsRef = useRef<Partial<ScreenDrawSettings> | null>(null);
+  const activeDisplayIdRef = useRef<number | null>(null);
   const workAreaRef = useRef<WorkArea>(FALLBACK_WORK_AREA);
   const barSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const pickerOpenRef = useRef(pickerOpen);
@@ -206,6 +227,17 @@ export function ToolbarView() {
     }
   }, [resolveBarPos]);
 
+  const applyToolbarSettings = useCallback(
+    (raw: unknown) => {
+      if (typeof raw !== "object" || raw === null) return;
+      const next = raw as Partial<ScreenDrawSettings>;
+      settingsRef.current = next;
+      posRef.current = selectToolbarPositionForDisplay(next, activeDisplayIdRef.current);
+      reportBounds();
+    },
+    [reportBounds],
+  );
+
   // Whether the bar should sit at the bottom (grow-up) or top (grow-down) of the
   // window while transparent reserve space is open for a tooltip/popover. Kept
   // in state so the flex alignment and tooltip side re-render.
@@ -222,7 +254,16 @@ export function ToolbarView() {
     (raw: unknown) => {
       if (!isToolbarState(raw)) return;
       if (raw.workArea) workAreaRef.current = raw.workArea;
-      if (raw.toolbarPosition !== undefined) posRef.current = raw.toolbarPosition;
+      if (raw.activeDisplayId !== undefined) {
+        activeDisplayIdRef.current =
+          typeof raw.activeDisplayId === "number" ? raw.activeDisplayId : null;
+        if (settingsRef.current) {
+          posRef.current = selectToolbarPositionForDisplay(
+            settingsRef.current,
+            activeDisplayIdRef.current,
+          );
+        }
+      }
       if (typeof raw.tool === "string") setTool(raw.tool);
       if (typeof raw.color === "string") setColor(raw.color);
       if (typeof raw.size === "number") setSize(raw.size);
@@ -264,27 +305,20 @@ export function ToolbarView() {
     return () => unsub?.();
   }, [applyState]);
 
-  // The persisted toolbar position lives in settings (not in the overlay's
-  // published state). Seed it on mount so a stored position is restored, then
+  // The persisted toolbar positions live in settings (not in the overlay's
+  // published state). Seed them on mount so a stored position is restored, then
   // follow settings:changed — the position changes from our own drag (persisted
-  // below) and from the overlay's Shift+T reset (which persists null).
+  // below), the overlay's Shift+T reset, and the control-panel scope selector.
   useEffect(() => {
     void window.screenDraw.ipc
-      .invoke<{ toolbarPosition?: { x: number; y: number } | null }>("settings:get")
-      .then((s) => {
-        posRef.current = s.toolbarPosition ?? null;
-        reportBounds();
-      })
+      .invoke<ScreenDrawSettings>("settings:get")
+      .then((s) => applyToolbarSettings(s))
       .catch(() => {});
     const unsub = window.screenDraw.ipc.on("settings:changed", (params) => {
-      const next = (params as { toolbarPosition?: { x: number; y: number } | null })
-        .toolbarPosition;
-      if (next === undefined) return;
-      posRef.current = next;
-      reportBounds();
+      applyToolbarSettings(params);
     });
     return () => unsub();
-  }, [reportBounds]);
+  }, [applyToolbarSettings]);
 
   // The hidden-in-recordings state lives in settings and syncs over
   // settings:changed (the same channel the Settings window and Shift+R use), not
