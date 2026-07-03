@@ -22,6 +22,7 @@ import {
   endDrag,
   getBounds,
   hitTest,
+  MIN_POINT_DISTANCE,
   redo as modelRedo,
   restyleSelected,
   selectShape,
@@ -33,6 +34,7 @@ import {
   type Point,
   type Shape,
 } from "./drawing-model";
+import { ephemeralAlpha, pruneExpiredEphemerals } from "./ephemeral-ink";
 
 interface OverlayWindowState {
   active?: boolean;
@@ -65,6 +67,7 @@ const TOOL_KEYS: Record<string, OverlayTool> = {
   v: "select",
   p: "pen",
   h: "highlighter",
+  f: "laser",
   l: "line",
   a: "arrow",
   r: "rectangle",
@@ -75,6 +78,7 @@ const OVERLAY_TOOLS = new Set<OverlayTool>([
   "select",
   "pen",
   "highlighter",
+  "laser",
   "line",
   "arrow",
   "rectangle",
@@ -83,6 +87,11 @@ const OVERLAY_TOOLS = new Set<OverlayTool>([
 
 /** Padding between a selected shape's bounds and the dashed indicator box. */
 const SELECTION_PADDING = 4;
+
+interface LaserStroke {
+  shape: Shape;
+  endedAt: number | null;
+}
 
 function isOverlayTool(value: unknown): value is OverlayTool {
   return typeof value === "string" && OVERLAY_TOOLS.has(value as OverlayTool);
@@ -156,20 +165,30 @@ function drawArrowHead(ctx: CanvasRenderingContext2D, from: Point, to: Point, si
 }
 
 /** Paint `shape` onto `ctx` at the tool's own opacity (0.35 for the highlighter). */
-function drawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
+function drawShape(
+  ctx: CanvasRenderingContext2D,
+  shape: Shape,
+  options: { alpha?: number; glow?: boolean } = {},
+) {
   const { points: pts } = shape;
   if (pts.length === 0) return;
 
+  ctx.save();
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.strokeStyle = shape.color;
   ctx.fillStyle = shape.color;
+  if (options.glow) {
+    ctx.shadowBlur = shape.size * 2;
+    ctx.shadowColor = shape.color;
+  }
 
+  const alpha = options.alpha ?? 1;
   if (shape.tool === "highlighter") {
-    ctx.globalAlpha = 0.35;
+    ctx.globalAlpha = 0.35 * alpha;
     ctx.lineWidth = shape.size * 5;
   } else {
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = alpha;
     ctx.lineWidth = shape.size;
   }
 
@@ -210,7 +229,7 @@ function drawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
     }
   }
 
-  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 export function OverlayView() {
@@ -218,6 +237,9 @@ export function OverlayView() {
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const modelRef = useRef<DrawingModel>(createModel());
   const drawingRef = useRef(false);
+  const laserStrokesRef = useRef<LaserStroke[]>([]);
+  const activeLaserStrokeRef = useRef<LaserStroke | null>(null);
+  const laserLoopActiveRef = useRef(false);
   // Whether this overlay is in interactive drawing mode. In sticky the windows
   // stay visible (and may still hold focus right after pinning), so the keydown
   // handler must early-out — otherwise `C`/`T`/⌘Z would act on the pinned ink.
@@ -277,6 +299,10 @@ export function OverlayView() {
     const canvas = canvasRef.current;
     if (!ctx || !canvas) return;
     const model = modelRef.current;
+    const now = performance.now();
+    if (laserStrokesRef.current.length > 0) {
+      laserStrokesRef.current = pruneExpiredEphemerals(laserStrokesRef.current, now);
+    }
 
     let layer = committedLayerRef.current;
     const stale =
@@ -308,6 +334,10 @@ export function OverlayView() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(layer.canvas, 0, 0);
     ctx.restore();
+    for (const stroke of laserStrokesRef.current) {
+      const alpha = ephemeralAlpha(stroke, now);
+      if (alpha > 0) drawShape(ctx, stroke.shape, { alpha, glow: true });
+    }
     if (model.current) {
       drawShape(ctx, model.current);
     }
@@ -335,8 +365,18 @@ export function OverlayView() {
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = null;
       redraw();
+      if (laserLoopActiveRef.current) {
+        if (laserStrokesRef.current.length > 0) scheduleRedraw();
+        else laserLoopActiveRef.current = false;
+      }
     });
   }, [redraw]);
+
+  const startLaserLoop = useCallback(() => {
+    if (laserStrokesRef.current.length === 0) return;
+    laserLoopActiveRef.current = true;
+    scheduleRedraw();
+  }, [scheduleRedraw]);
 
   // Cancel a pending frame on unmount so the rAF callback never touches a
   // detached canvas. Own effect (not the canvas effect's cleanup, which fires on
@@ -344,6 +384,7 @@ export function OverlayView() {
   useEffect(() => {
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      laserLoopActiveRef.current = false;
     };
   }, []);
 
@@ -411,6 +452,53 @@ export function OverlayView() {
   const clearAll = useCallback(() => {
     applyModel(modelClearAll(modelRef.current));
   }, [applyModel]);
+
+  const startLaserStroke = useCallback(
+    (point: Point) => {
+      const stroke: LaserStroke = {
+        shape: {
+          tool: "pen",
+          color: colorRef.current,
+          size: sizeRef.current,
+          points: [point],
+        },
+        endedAt: null,
+      };
+      activeLaserStrokeRef.current = stroke;
+      laserStrokesRef.current = [...laserStrokesRef.current, stroke];
+      drawingRef.current = true;
+      startLaserLoop();
+    },
+    [startLaserLoop],
+  );
+
+  const updateLaserStroke = useCallback(
+    (point: Point, shift: boolean) => {
+      const stroke = activeLaserStrokeRef.current;
+      if (!stroke) return;
+      const points = stroke.shape.points;
+      const start = points[0];
+      if (shift) {
+        stroke.shape = { ...stroke.shape, points: [start, point] };
+      } else {
+        const last = points[points.length - 1];
+        if (Math.hypot(point.x - last.x, point.y - last.y) < MIN_POINT_DISTANCE) return;
+        stroke.shape = { ...stroke.shape, points: [...points, point] };
+      }
+      startLaserLoop();
+    },
+    [startLaserLoop],
+  );
+
+  const finishLaserStroke = useCallback(() => {
+    const stroke = activeLaserStrokeRef.current;
+    if (!stroke) return false;
+    stroke.endedAt = performance.now();
+    activeLaserStrokeRef.current = null;
+    drawingRef.current = false;
+    startLaserLoop();
+    return true;
+  }, [startLaserLoop]);
 
   const requestVanishingToggle = useCallback(() => {
     void window.screenDraw.ipc.invoke("overlay:toggleVanishing");
@@ -499,9 +587,10 @@ export function OverlayView() {
   // half-drawn stroke never floats over the user's normal work. Run on every
   // overlay (a selection can live on a non-active display). Committed shapes stay.
   const cancelInteraction = useCallback(() => {
+    finishLaserStroke();
     drawingRef.current = false;
     applyModel(selectShape(cancelDrag(discardCurrent(modelRef.current)), null));
-  }, [applyModel]);
+  }, [applyModel, finishLaserStroke]);
 
   // Follow the tri-state broadcast. On a FULL exit (hidden: !active && !sticky)
   // with session ink ON, this overlay resets its model to a clean slate — canvas
@@ -720,6 +809,11 @@ export function OverlayView() {
         applyModel(next);
         return;
       }
+      if (activeTool === "laser") {
+        applyModel(selectShape(modelRef.current, null));
+        startLaserStroke(p);
+        return;
+      }
       applyModel(
         startShape(
           modelRef.current,
@@ -740,6 +834,10 @@ export function OverlayView() {
       // in selectThisDisplay prevents redundant IPC when already active.
       if (e.buttons === 0) selectThisDisplay();
       const model = modelRef.current;
+      if (activeLaserStrokeRef.current) {
+        updateLaserStroke(toPoint(e), e.shiftKey);
+        return;
+      }
       if (model.drag) {
         applyModel(updateDrag(model, toPoint(e)));
         return;
@@ -749,6 +847,7 @@ export function OverlayView() {
     };
 
     const onPointerUp = () => {
+      if (finishLaserStroke()) return;
       const model = modelRef.current;
       if (model.drag) {
         applyModel(endDrag(model));
@@ -906,6 +1005,9 @@ export function OverlayView() {
     selectThisDisplay,
     changeTool,
     requestVanishingToggle,
+    startLaserStroke,
+    updateLaserStroke,
+    finishLaserStroke,
   ]);
 
   return (

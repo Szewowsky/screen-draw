@@ -27,6 +27,7 @@ Screen Draw is in one of three states:
 | Select & move | `V` | Click selects the topmost shape (generous hit area incl. arrowheads); drag moves it; `⌫`/`Delete` removes it. Click empty canvas to deselect. While selected, the toolbar mirrors the shape's color/size — a color swatch (or `1`–`6`), the popover, or the size slider (or `[`/`]`) restyles the selection instead of the new-stroke defaults (undoable; deselect restores your defaults). |
 | Pen | `P` | Freehand. Hold `⇧` for a straight line. |
 | Highlighter | `H` | Wide translucent band. Hold `⇧` for a straight line. |
+| Laser pointer | `F` | Temporary freehand pointer ink using the current color and brush size. A released stroke holds briefly, fades out, and never enters undo/redo, selection, clear-all, or session-ink wipes. |
 | Line | `L` | Hold `⇧` to snap to 45° angles. |
 | Arrow | `A` | Hold `⇧` to snap to 45° angles. |
 | Rectangle | `R` | Hold `⇧` for a square. |

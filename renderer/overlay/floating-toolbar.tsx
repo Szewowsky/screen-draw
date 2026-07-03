@@ -49,6 +49,7 @@ import {
   Undo2,
   VideoOff,
   X,
+  Zap,
 } from "lucide-react";
 import {
   COLOR_PRESETS,
@@ -64,6 +65,7 @@ export const TOOLS: { tool: OverlayTool; label: string; key: string; Icon: typeo
   { tool: "select", label: "Select", key: "V", Icon: MousePointer2 },
   { tool: "pen", label: "Pen", key: "P", Icon: Pencil },
   { tool: "highlighter", label: "Highlighter", key: "H", Icon: Highlighter },
+  { tool: "laser", label: "Laser pointer", key: "F", Icon: Zap },
   { tool: "line", label: "Line", key: "L", Icon: Minus },
   { tool: "arrow", label: "Arrow", key: "A", Icon: ArrowUpRight },
   { tool: "rectangle", label: "Rectangle", key: "R", Icon: Square },

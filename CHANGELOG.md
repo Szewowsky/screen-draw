@@ -2,6 +2,11 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
+## 1.7.0 — 2026-07-03
+
+### Added
+- **Laser pointer** (`F`): temporary glowing strokes use the current color and brush size, hold briefly after release, then fade away without entering undo/redo, selection, clear-all, or session-ink wipes.
+
 ## 1.6.5 — 2026-07-03
 
 ### Added
