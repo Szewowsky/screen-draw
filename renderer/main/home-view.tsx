@@ -33,6 +33,7 @@ const SHORTCUT_ROWS: { label: string; keys: ReactNode }[] = [
   { label: "Highlighter", keys: <Key>H</Key> },
   { label: "Laser pointer", keys: <Key>F</Key> },
   { label: "Eraser", keys: <Key>E</Key> },
+  { label: "Text", keys: <Key>X</Key> },
   { label: "Line", keys: <Key>L</Key> },
   { label: "Arrow", keys: <Key>A</Key> },
   { label: "Rectangle", keys: <Key>R</Key> },

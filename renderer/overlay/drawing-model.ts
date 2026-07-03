@@ -478,7 +478,10 @@ const DEFAULT_TEXT_MEASURE: MeasureText = (text, fontPx) => ({
 });
 
 /** Axis-aligned bounding box of a shape's painted extent (stroke width included). */
-export function getBounds(shape: Shape, measureText: MeasureText = DEFAULT_TEXT_MEASURE): Bounds | null {
+export function getBounds(
+  shape: Shape,
+  measureText: MeasureText = DEFAULT_TEXT_MEASURE,
+): Bounds | null {
   const pts = shape.points;
   if (pts.length === 0) return null;
   if (shape.tool === "text") {
@@ -539,11 +542,15 @@ export function beginErase(model: DrawingModel): DrawingModel {
   };
 }
 
-function eraseHitsAt(shapes: readonly Shape[], point: Point): readonly Shape[] | null {
+function eraseHitsAt(
+  shapes: readonly Shape[],
+  point: Point,
+  measureText: MeasureText,
+): readonly Shape[] | null {
   let remaining = shapes;
   let erased = false;
   while (true) {
-    const index = hitTest(remaining, point);
+    const index = hitTest(remaining, point, measureText);
     if (index === null) return erased ? remaining : null;
     remaining = [...remaining.slice(0, index), ...remaining.slice(index + 1)];
     erased = true;
@@ -551,16 +558,22 @@ function eraseHitsAt(shapes: readonly Shape[], point: Point): readonly Shape[] |
 }
 
 /** Erase every committed shape touched by `point`, coalescing one drag into one undo entry. */
-export function eraseAt(model: DrawingModel, point: Point): DrawingModel {
+export function eraseAt(
+  model: DrawingModel,
+  point: Point,
+  measureText: MeasureText = DEFAULT_TEXT_MEASURE,
+): DrawingModel {
   const eraseDrag = model.eraseDrag;
   if (!eraseDrag) return model;
-  const shapes = eraseHitsAt(model.shapes, point);
+  const shapes = eraseHitsAt(model.shapes, point, measureText);
   if (!shapes) return model;
   return {
     ...model,
     shapes,
     eraseDrag: { ...eraseDrag, erased: true },
-    undoStack: eraseDrag.erased ? model.undoStack : pushHistory(model.undoStack, eraseDrag.baseShapes),
+    undoStack: eraseDrag.erased
+      ? model.undoStack
+      : pushHistory(model.undoStack, eraseDrag.baseShapes),
     redoStack: [],
     revision: model.revision + 1,
   };

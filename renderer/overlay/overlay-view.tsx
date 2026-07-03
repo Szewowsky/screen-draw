@@ -8,6 +8,7 @@ import {
   type ScreenDrawSettings,
 } from "./constants";
 import {
+  addText,
   arrowHeadPoints,
   beginDrag,
   canRedo as modelCanRedo,
@@ -31,10 +32,12 @@ import {
   restyleSelected,
   selectShape,
   startShape,
+  textFontPx,
   undo as modelUndo,
   updateDrag,
   updateShape,
   type DrawingModel,
+  type MeasureText,
   type Point,
   type Shape,
 } from "./drawing-model";
@@ -73,6 +76,7 @@ const TOOL_KEYS: Record<string, OverlayTool> = {
   h: "highlighter",
   f: "laser",
   e: "eraser",
+  x: "text",
   l: "line",
   a: "arrow",
   r: "rectangle",
@@ -85,6 +89,7 @@ const OVERLAY_TOOLS = new Set<OverlayTool>([
   "highlighter",
   "laser",
   "eraser",
+  "text",
   "line",
   "arrow",
   "rectangle",
@@ -105,13 +110,29 @@ const ERASER_CURSOR_SVG = encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="${ERASER_CURSOR_SIZE}" height="${ERASER_CURSOR_SIZE}" viewBox="0 0 ${ERASER_CURSOR_SIZE} ${ERASER_CURSOR_SIZE}"><circle cx="${ERASER_CURSOR_RADIUS}" cy="${ERASER_CURSOR_RADIUS}" r="${ERASER_CURSOR_RADIUS - 0.75}" fill="none" stroke="white" stroke-width="1.5"/><circle cx="${ERASER_CURSOR_RADIUS}" cy="${ERASER_CURSOR_RADIUS}" r="${ERASER_CURSOR_RADIUS - 1.5}" fill="none" stroke="black" stroke-width="1"/></svg>`,
 );
 const ERASER_CURSOR = `url("data:image/svg+xml,${ERASER_CURSOR_SVG}") ${ERASER_CURSOR_RADIUS} ${ERASER_CURSOR_RADIUS}, auto`;
+const TEXT_FONT_FAMILY = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+interface TextInputState {
+  anchor: Point;
+  color: string;
+  size: number;
+  value: string;
+}
+
+function textFont(fontPx: number): string {
+  return `${fontPx}px ${TEXT_FONT_FAMILY}`;
+}
 
 function isOverlayTool(value: unknown): value is OverlayTool {
   return typeof value === "string" && OVERLAY_TOOLS.has(value as OverlayTool);
 }
 
-function drawSelectionIndicator(ctx: CanvasRenderingContext2D, shape: Shape) {
-  const bounds = getBounds(shape);
+function drawSelectionIndicator(
+  ctx: CanvasRenderingContext2D,
+  shape: Shape,
+  measureText: MeasureText,
+) {
+  const bounds = getBounds(shape, measureText);
   if (!bounds) return;
   ctx.save();
   ctx.globalAlpha = 1;
@@ -216,6 +237,13 @@ function drawShape(
       ctx.lineTo(pts[0].x + 0.1, pts[0].y);
     }
     ctx.stroke();
+  } else if (shape.tool === "text") {
+    const text = shape.text ?? "";
+    if (text.length > 0) {
+      ctx.font = textFont(textFontPx(shape.size));
+      ctx.textBaseline = "top";
+      ctx.fillText(text, pts[0].x, pts[0].y);
+    }
   } else {
     const a = pts[0];
     const b = pts[pts.length - 1];
@@ -253,6 +281,9 @@ export function OverlayView() {
   const laserStrokesRef = useRef<LaserStroke[]>([]);
   const activeLaserStrokeRef = useRef<LaserStroke | null>(null);
   const laserLoopActiveRef = useRef(false);
+  const textInputStateRef = useRef<TextInputState | null>(null);
+  const textInputElementRef = useRef<HTMLInputElement>(null);
+  const textMeasureCacheRef = useRef<Map<string, { width: number; height: number }>>(new Map());
   // Whether this overlay is in interactive drawing mode. In sticky the windows
   // stay visible (and may still hold focus right after pinning), so the keydown
   // handler must early-out — otherwise `C`/`T`/⌘Z would act on the pinned ink.
@@ -262,6 +293,7 @@ export function OverlayView() {
   const [tool, setTool] = useState<OverlayTool>("pen");
   const [color, setColor] = useState(PALETTE[0].value);
   const [size, setSize] = useState(4);
+  const [textInput, setTextInput] = useState<TextInputState | null>(null);
   const [recentColors, setRecentColors] = useState<string[]>([]);
   // Style (color/size) of the currently selected shape, or null when nothing is
   // selected. Published to the toolbar so it mirrors the selection; kept
@@ -306,6 +338,20 @@ export function OverlayView() {
   // Pending animation-frame id for a scheduled repaint (null = none in flight).
   // Doubles as the coalescing flag and the cancel handle.
   const rafRef = useRef<number | null>(null);
+
+  const measureTextForCanvas = useCallback<MeasureText>((text, fontPx) => {
+    const key = `${fontPx}\0${text}`;
+    const cached = textMeasureCacheRef.current.get(key);
+    if (cached) return cached;
+    const ctx = ctxRef.current;
+    if (!ctx) return { width: text.length * fontPx * 0.6, height: fontPx };
+    ctx.save();
+    ctx.font = textFont(fontPx);
+    const measured = { width: ctx.measureText(text).width, height: fontPx };
+    ctx.restore();
+    textMeasureCacheRef.current.set(key, measured);
+    return measured;
+  }, []);
 
   const redraw = useCallback(() => {
     const ctx = ctxRef.current;
@@ -364,9 +410,9 @@ export function OverlayView() {
           : null;
     if (selected) {
       if (model.drag) drawShape(ctx, selected);
-      drawSelectionIndicator(ctx, selected);
+      drawSelectionIndicator(ctx, selected, measureTextForCanvas);
     }
-  }, []);
+  }, [measureTextForCanvas]);
 
   // Coalesce several triggers in one frame (pointer drag + broadcast + toolbar
   // action) into a single clear+blit: set a pending frame if none is in flight,
@@ -443,6 +489,11 @@ export function OverlayView() {
     redraw();
   }, [redraw]);
 
+  const setTextInputState = useCallback((next: TextInputState | null) => {
+    textInputStateRef.current = next;
+    setTextInput(next);
+  }, []);
+
   const changeTool = useCallback(
     (next: OverlayTool) => {
       setTool(next);
@@ -465,6 +516,24 @@ export function OverlayView() {
   const clearAll = useCallback(() => {
     applyModel(modelClearAll(modelRef.current));
   }, [applyModel]);
+
+  const cancelTextInput = useCallback(() => {
+    setTextInputState(null);
+  }, [setTextInputState]);
+
+  const commitTextInput = useCallback(() => {
+    const current = textInputStateRef.current;
+    if (!current) return;
+    setTextInputState(null);
+    if (current.value.length === 0) return;
+    applyModel(
+      addText(
+        modelRef.current,
+        { color: current.color, size: current.size, text: current.value },
+        current.anchor,
+      ),
+    );
+  }, [applyModel, setTextInputState]);
 
   const startLaserStroke = useCallback(
     (point: Point) => {
@@ -601,9 +670,14 @@ export function OverlayView() {
   // overlay (a selection can live on a non-active display). Committed shapes stay.
   const cancelInteraction = useCallback(() => {
     finishLaserStroke();
+    cancelTextInput();
     drawingRef.current = false;
     applyModel(selectShape(endErase(cancelDrag(discardCurrent(modelRef.current))), null));
-  }, [applyModel, finishLaserStroke]);
+  }, [applyModel, cancelTextInput, finishLaserStroke]);
+
+  useEffect(() => {
+    textInputElementRef.current?.focus();
+  }, [textInput]);
 
   // Follow the tri-state broadcast. On a FULL exit (hidden: !active && !sticky)
   // with session ink ON, this overlay resets its model to a clean slate — canvas
@@ -816,7 +890,7 @@ export function OverlayView() {
       if (activeTool === "select") {
         // Click selects the topmost hit shape (and arms a drag) or deselects.
         const model = modelRef.current;
-        const index = hitTest(model.shapes, p);
+        const index = hitTest(model.shapes, p, measureTextForCanvas);
         let next = selectShape(model, index);
         if (index !== null) next = beginDrag(next, p);
         applyModel(next);
@@ -829,7 +903,18 @@ export function OverlayView() {
       }
       if (activeTool === "eraser") {
         drawingRef.current = true;
-        applyModel(eraseAt(beginErase(modelRef.current), p));
+        applyModel(eraseAt(beginErase(modelRef.current), p, measureTextForCanvas));
+        return;
+      }
+      if (activeTool === "text") {
+        drawingRef.current = false;
+        applyModel(selectShape(modelRef.current, null));
+        setTextInputState({
+          anchor: p,
+          color: colorRef.current,
+          size: sizeRef.current,
+          value: "",
+        });
         return;
       }
       applyModel(
@@ -861,7 +946,7 @@ export function OverlayView() {
         return;
       }
       if (model.eraseDrag) {
-        applyModel(eraseAt(model, toPoint(e)));
+        applyModel(eraseAt(model, toPoint(e), measureTextForCanvas));
         return;
       }
       if (!drawingRef.current || !model.current) return;
@@ -1035,6 +1120,8 @@ export function OverlayView() {
     startLaserStroke,
     updateLaserStroke,
     finishLaserStroke,
+    setTextInputState,
+    measureTextForCanvas,
   ]);
 
   return (
@@ -1047,6 +1134,41 @@ export function OverlayView() {
         }
         style={tool === "eraser" ? { cursor: ERASER_CURSOR } : undefined}
       />
+      {textInput ? (
+        <input
+          ref={textInputElementRef}
+          type="text"
+          value={textInput.value}
+          spellCheck={false}
+          autoComplete="off"
+          aria-label="Annotation text"
+          onChange={(e) => {
+            setTextInputState({ ...textInput, value: e.currentTarget.value });
+          }}
+          onBlur={commitTextInput}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.stopPropagation();
+              commitTextInput();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              e.stopPropagation();
+              cancelTextInput();
+            }
+          }}
+          className="absolute z-10 min-w-40 border-0 bg-transparent p-0 outline-none"
+          style={{
+            left: textInput.anchor.x,
+            top: textInput.anchor.y,
+            color: textInput.color,
+            fontFamily: TEXT_FONT_FAMILY,
+            fontSize: textFontPx(textInput.size),
+            lineHeight: `${textFontPx(textInput.size)}px`,
+            caretColor: textInput.color,
+          }}
+        />
+      ) : null}
     </div>
   );
 }

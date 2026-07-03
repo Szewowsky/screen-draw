@@ -29,6 +29,7 @@ Screen Draw is in one of three states:
 | Highlighter | `H` | Wide translucent band. Hold `⇧` for a straight line. |
 | Laser pointer | `F` | Temporary freehand pointer ink using the current color and brush size. A released stroke holds briefly, fades out, and never enters undo/redo, selection, clear-all, or session-ink wipes. |
 | Eraser | `E` | Drag across committed shapes to remove every touched stroke or shape. One eraser drag is one undo step. |
+| Text | `X` | Click to place a single-line text caret. `Enter` commits, `Esc` cancels, and non-empty blur commits. Committed text is selectable, movable, restylable, deletable, and undoable like other shapes. |
 | Line | `L` | Hold `⇧` to snap to 45° angles. |
 | Arrow | `A` | Hold `⇧` to snap to 45° angles. |
 | Rectangle | `R` | Hold `⇧` for a square. |
