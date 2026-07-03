@@ -393,14 +393,14 @@ export function HomeView() {
               className="w-full"
               aria-label="Toolbar position on other displays"
             >
-              <SegmentedControlItem value="shared" className="flex-1 text-center leading-tight">
-                Same position as primary
+              <SegmentedControlItem value="shared" className="flex-1 text-center whitespace-nowrap">
+                Same as primary
               </SegmentedControlItem>
               <SegmentedControlItem
                 value="per-display"
-                className="flex-1 text-center leading-tight"
+                className="flex-1 text-center whitespace-nowrap"
               >
-                Remembered per display
+                Per display
               </SegmentedControlItem>
             </SegmentedControl>
           </Field>
