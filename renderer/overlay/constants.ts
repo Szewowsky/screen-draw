@@ -43,7 +43,7 @@ export const MAX_SIZE = 24;
 export type DrawTool = "pen" | "highlighter" | "line" | "arrow" | "rectangle" | "ellipse";
 
 /** Tools available in the overlay toolbar: drawing tools plus the select tool. */
-export type OverlayTool = DrawTool | "select" | "laser";
+export type OverlayTool = DrawTool | "select" | "laser" | "eraser";
 
 export interface ToolbarPosition {
   x: number;

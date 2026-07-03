@@ -28,6 +28,7 @@ Screen Draw is in one of three states:
 | Pen | `P` | Freehand. Hold `⇧` for a straight line. |
 | Highlighter | `H` | Wide translucent band. Hold `⇧` for a straight line. |
 | Laser pointer | `F` | Temporary freehand pointer ink using the current color and brush size. A released stroke holds briefly, fades out, and never enters undo/redo, selection, clear-all, or session-ink wipes. |
+| Eraser | `E` | Drag across committed shapes to remove every touched stroke or shape. One eraser drag is one undo step. |
 | Line | `L` | Hold `⇧` to snap to 45° angles. |
 | Arrow | `A` | Hold `⇧` to snap to 45° angles. |
 | Rectangle | `R` | Hold `⇧` for a square. |

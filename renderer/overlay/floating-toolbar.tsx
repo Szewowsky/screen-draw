@@ -66,6 +66,7 @@ export const TOOLS: { tool: OverlayTool; label: string; key: string; Icon: typeo
   { tool: "pen", label: "Pen", key: "P", Icon: Pencil },
   { tool: "highlighter", label: "Highlighter", key: "H", Icon: Highlighter },
   { tool: "laser", label: "Laser pointer", key: "F", Icon: Zap },
+  { tool: "eraser", label: "Eraser", key: "E", Icon: Eraser },
   { tool: "line", label: "Line", key: "L", Icon: Minus },
   { tool: "arrow", label: "Arrow", key: "A", Icon: ArrowUpRight },
   { tool: "rectangle", label: "Rectangle", key: "R", Icon: Square },

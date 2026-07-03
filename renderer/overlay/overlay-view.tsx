@@ -16,11 +16,15 @@ import {
   clearAll as modelClearAll,
   commitShape,
   createModel,
+  beginErase,
   deleteSelected,
   discardCurrent,
   draggedShape,
   endDrag,
+  endErase,
+  eraseAt,
   getBounds,
+  HIT_TOLERANCE,
   hitTest,
   MIN_POINT_DISTANCE,
   redo as modelRedo,
@@ -68,6 +72,7 @@ const TOOL_KEYS: Record<string, OverlayTool> = {
   p: "pen",
   h: "highlighter",
   f: "laser",
+  e: "eraser",
   l: "line",
   a: "arrow",
   r: "rectangle",
@@ -79,6 +84,7 @@ const OVERLAY_TOOLS = new Set<OverlayTool>([
   "pen",
   "highlighter",
   "laser",
+  "eraser",
   "line",
   "arrow",
   "rectangle",
@@ -92,6 +98,13 @@ interface LaserStroke {
   shape: Shape;
   endedAt: number | null;
 }
+
+const ERASER_CURSOR_RADIUS = HIT_TOLERANCE;
+const ERASER_CURSOR_SIZE = ERASER_CURSOR_RADIUS * 2;
+const ERASER_CURSOR_SVG = encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${ERASER_CURSOR_SIZE}" height="${ERASER_CURSOR_SIZE}" viewBox="0 0 ${ERASER_CURSOR_SIZE} ${ERASER_CURSOR_SIZE}"><circle cx="${ERASER_CURSOR_RADIUS}" cy="${ERASER_CURSOR_RADIUS}" r="${ERASER_CURSOR_RADIUS - 0.75}" fill="none" stroke="white" stroke-width="1.5"/><circle cx="${ERASER_CURSOR_RADIUS}" cy="${ERASER_CURSOR_RADIUS}" r="${ERASER_CURSOR_RADIUS - 1.5}" fill="none" stroke="black" stroke-width="1"/></svg>`,
+);
+const ERASER_CURSOR = `url("data:image/svg+xml,${ERASER_CURSOR_SVG}") ${ERASER_CURSOR_RADIUS} ${ERASER_CURSOR_RADIUS}, auto`;
 
 function isOverlayTool(value: unknown): value is OverlayTool {
   return typeof value === "string" && OVERLAY_TOOLS.has(value as OverlayTool);
@@ -589,7 +602,7 @@ export function OverlayView() {
   const cancelInteraction = useCallback(() => {
     finishLaserStroke();
     drawingRef.current = false;
-    applyModel(selectShape(cancelDrag(discardCurrent(modelRef.current)), null));
+    applyModel(selectShape(endErase(cancelDrag(discardCurrent(modelRef.current))), null));
   }, [applyModel, finishLaserStroke]);
 
   // Follow the tri-state broadcast. On a FULL exit (hidden: !active && !sticky)
@@ -814,6 +827,11 @@ export function OverlayView() {
         startLaserStroke(p);
         return;
       }
+      if (activeTool === "eraser") {
+        drawingRef.current = true;
+        applyModel(eraseAt(beginErase(modelRef.current), p));
+        return;
+      }
       applyModel(
         startShape(
           modelRef.current,
@@ -842,6 +860,10 @@ export function OverlayView() {
         applyModel(updateDrag(model, toPoint(e)));
         return;
       }
+      if (model.eraseDrag) {
+        applyModel(eraseAt(model, toPoint(e)));
+        return;
+      }
       if (!drawingRef.current || !model.current) return;
       applyModel(updateShape(model, toPoint(e), e.shiftKey));
     };
@@ -851,6 +873,11 @@ export function OverlayView() {
       const model = modelRef.current;
       if (model.drag) {
         applyModel(endDrag(model));
+        return;
+      }
+      if (model.eraseDrag) {
+        drawingRef.current = false;
+        applyModel(endErase(model));
         return;
       }
       if (!drawingRef.current) return;
@@ -1015,8 +1042,10 @@ export function OverlayView() {
       <canvas
         ref={canvasRef}
         className={
-          "absolute inset-0 " + (tool === "select" ? "cursor-default" : "cursor-crosshair")
+          "absolute inset-0 " +
+          (tool === "select" ? "cursor-default" : tool === "eraser" ? "" : "cursor-crosshair")
         }
+        style={tool === "eraser" ? { cursor: ERASER_CURSOR } : undefined}
       />
     </div>
   );
