@@ -26,6 +26,19 @@ describe("pickAdoptableToolbarState", () => {
     ).toEqual({ tool: "select", color: "#FF3B30", size: 4 });
   });
 
+  it("accepts presenter tools added in 1.7 without adopting board mode", () => {
+    for (const tool of ["laser", "eraser", "text"] as const) {
+      expect(
+        pickAdoptableToolbarState({
+          tool,
+          color: "#FF3B30",
+          size: 4,
+          boardMode: "black",
+        }),
+      ).toEqual({ tool, color: "#FF3B30", size: 4 });
+    }
+  });
+
   it("ignores malformed vanishing values without rejecting the tool state", () => {
     const result = pickAdoptableToolbarState({
       tool: "pen",
@@ -41,7 +54,7 @@ describe("pickAdoptableToolbarState", () => {
     for (const raw of [
       null,
       [],
-      { tool: "eraser", color: "#FF3B30", size: 4 },
+      { tool: "board", color: "#FF3B30", size: 4 },
       { tool: "pen", color: "", size: 4 },
       { tool: "pen", color: "#FF3B30", size: 0 },
       { tool: "pen", color: "#FF3B30", size: Number.NaN },

@@ -1,5 +1,15 @@
 export type AdoptableToolbarState = {
-  tool: "select" | "pen" | "highlighter" | "line" | "arrow" | "rectangle" | "ellipse";
+  tool:
+    | "select"
+    | "pen"
+    | "highlighter"
+    | "laser"
+    | "eraser"
+    | "text"
+    | "line"
+    | "arrow"
+    | "rectangle"
+    | "ellipse";
   color: string;
   size: number;
   vanishing?: boolean;
@@ -9,6 +19,9 @@ const ADOPTABLE_TOOLS = new Set<AdoptableToolbarState["tool"]>([
   "select",
   "pen",
   "highlighter",
+  "laser",
+  "eraser",
+  "text",
   "line",
   "arrow",
   "rectangle",
