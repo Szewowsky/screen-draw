@@ -54,6 +54,13 @@ export interface DragState {
   readonly dy: number;
 }
 
+export interface EraseDragState {
+  /** The committed set before the eraser drag, recorded when the first hit happens. */
+  readonly baseShapes: readonly Shape[];
+  /** True once this drag has erased at least one shape and recorded history. */
+  readonly erased: boolean;
+}
+
 export interface DrawingModel {
   /** Committed shapes in painter order (last = topmost). */
   readonly shapes: readonly Shape[];
@@ -63,6 +70,8 @@ export interface DrawingModel {
   readonly selectedIndex: number | null;
   /** The in-progress move of the selected shape, if any. */
   readonly drag: DragState | null;
+  /** The in-progress eraser drag, if any. */
+  readonly eraseDrag: EraseDragState | null;
   readonly undoStack: readonly (readonly Shape[])[];
   readonly redoStack: readonly (readonly Shape[])[];
   /**
@@ -79,6 +88,7 @@ export function createModel(): DrawingModel {
     current: null,
     selectedIndex: null,
     drag: null,
+    eraseDrag: null,
     undoStack: [],
     redoStack: [],
     revision: 0,
@@ -172,7 +182,7 @@ export function commitShape(model: DrawingModel): DrawingModel {
 
 export function undo(model: DrawingModel): DrawingModel {
   const snapshot = model.undoStack[model.undoStack.length - 1];
-  if (!snapshot || model.drag) return model;
+  if (!snapshot || model.drag || model.eraseDrag) return model;
   return {
     ...model,
     shapes: snapshot,
@@ -185,7 +195,7 @@ export function undo(model: DrawingModel): DrawingModel {
 
 export function redo(model: DrawingModel): DrawingModel {
   const snapshot = model.redoStack[model.redoStack.length - 1];
-  if (!snapshot || model.drag) return model;
+  if (!snapshot || model.drag || model.eraseDrag) return model;
   return {
     ...model,
     shapes: snapshot,
@@ -198,7 +208,7 @@ export function redo(model: DrawingModel): DrawingModel {
 
 /** Remove all committed shapes. Undoable like any other operation. */
 export function clearAll(model: DrawingModel): DrawingModel {
-  if (model.shapes.length === 0 && !model.drag) return model;
+  if (model.eraseDrag || (model.shapes.length === 0 && !model.drag)) return model;
   return {
     ...model,
     shapes: [],
@@ -212,7 +222,7 @@ export function clearAll(model: DrawingModel): DrawingModel {
 
 /** Select the shape at `index` (or deselect with null). No-op while dragging. */
 export function selectShape(model: DrawingModel, index: number | null): DrawingModel {
-  if (model.drag) return model;
+  if (model.drag || model.eraseDrag) return model;
   const valid = index !== null && index >= 0 && index < model.shapes.length ? index : null;
   if (valid === model.selectedIndex) return model;
   return { ...model, selectedIndex: valid };
@@ -224,7 +234,7 @@ export function selectShape(model: DrawingModel, index: number | null): DrawingM
  * while the drag is in progress.
  */
 export function beginDrag(model: DrawingModel, point: Point): DrawingModel {
-  if (model.drag || model.selectedIndex === null) return model;
+  if (model.drag || model.eraseDrag || model.selectedIndex === null) return model;
   const index = model.selectedIndex;
   const base = model.shapes[index];
   return {
@@ -290,7 +300,7 @@ export function cancelDrag(model: DrawingModel): DrawingModel {
 
 /** Delete the selected shape. Undoable like any other operation. */
 export function deleteSelected(model: DrawingModel): DrawingModel {
-  if (model.drag || model.selectedIndex === null) return model;
+  if (model.drag || model.eraseDrag || model.selectedIndex === null) return model;
   return {
     ...model,
     shapes: model.shapes.filter((_, i) => i !== model.selectedIndex),
@@ -354,7 +364,7 @@ export function restyleSelected(
   style: ShapeStyle,
   options: { coalesce?: boolean } = {},
 ): DrawingModel {
-  if (model.drag || model.selectedIndex === null) return model;
+  if (model.drag || model.eraseDrag || model.selectedIndex === null) return model;
   const index = model.selectedIndex;
   const shape = model.shapes[index];
   const color = style.color ?? shape.color;
@@ -462,6 +472,50 @@ function withinPolyline(point: Point, pts: readonly Point[], radius: number): bo
     if (distanceToSegment(point, pts[i - 1], pts[i]) <= radius) return true;
   }
   return false;
+}
+
+/** Begin a stroke-level eraser drag. The undo snapshot is recorded only on first hit. */
+export function beginErase(model: DrawingModel): DrawingModel {
+  if (model.drag || model.eraseDrag) return model;
+  return {
+    ...model,
+    current: null,
+    selectedIndex: null,
+    eraseDrag: { baseShapes: model.shapes, erased: false },
+  };
+}
+
+function eraseHitsAt(shapes: readonly Shape[], point: Point): readonly Shape[] | null {
+  let remaining = shapes;
+  let erased = false;
+  while (true) {
+    const index = hitTest(remaining, point);
+    if (index === null) return erased ? remaining : null;
+    remaining = [...remaining.slice(0, index), ...remaining.slice(index + 1)];
+    erased = true;
+  }
+}
+
+/** Erase every committed shape touched by `point`, coalescing one drag into one undo entry. */
+export function eraseAt(model: DrawingModel, point: Point): DrawingModel {
+  const eraseDrag = model.eraseDrag;
+  if (!eraseDrag) return model;
+  const shapes = eraseHitsAt(model.shapes, point);
+  if (!shapes) return model;
+  return {
+    ...model,
+    shapes,
+    eraseDrag: { ...eraseDrag, erased: true },
+    undoStack: eraseDrag.erased ? model.undoStack : pushHistory(model.undoStack, eraseDrag.baseShapes),
+    redoStack: [],
+    revision: model.revision + 1,
+  };
+}
+
+/** End the eraser drag. Empty drags leave history and revision untouched. */
+export function endErase(model: DrawingModel): DrawingModel {
+  if (!model.eraseDrag) return model;
+  return { ...model, eraseDrag: null };
 }
 
 const ELLIPSE_HIT_SAMPLES = 64;

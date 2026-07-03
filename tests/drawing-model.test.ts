@@ -7,7 +7,10 @@ import {
   commitShape,
   constrainPoint,
   createModel,
+  beginErase,
   discardCurrent,
+  endErase,
+  eraseAt,
   getBounds,
   MIN_POINT_DISTANCE,
   redo,
@@ -267,6 +270,79 @@ describe("undo/redo", () => {
     // The oldest `extra` shapes fell out of history and can no longer be undone.
     expect(model.shapes).toHaveLength(extra);
     expect(model.shapes[0].points).toEqual(p(0));
+  });
+});
+
+describe("eraser transitions", () => {
+  const verticalStroke = (x: number): Point[] => [
+    { x, y: 0 },
+    { x, y: 20 },
+  ];
+
+  it("erases every shape touched along a drag path", () => {
+    let model = drawStroke(createModel(), verticalStroke(0));
+    model = drawStroke(model, verticalStroke(12));
+    model = beginErase(model);
+
+    model = eraseAt(model, { x: 0, y: 10 });
+    model = eraseAt(model, { x: 12, y: 10 });
+    model = endErase(model);
+
+    expect(model.shapes).toEqual([]);
+  });
+
+  it("erases topmost-through-all shapes under the same point", () => {
+    let model = drawStroke(createModel(), verticalStroke(0));
+    model = drawStroke(model, verticalStroke(0), { ...PEN, color: "#0A84FF" });
+    model = beginErase(model);
+
+    model = eraseAt(model, { x: 0, y: 10 });
+    model = endErase(model);
+
+    expect(model.shapes).toEqual([]);
+  });
+
+  it("undo restores all shapes erased in one drag", () => {
+    let model = drawStroke(createModel(), verticalStroke(0));
+    model = drawStroke(model, verticalStroke(12));
+    const beforeErase = model.shapes;
+
+    model = beginErase(model);
+    model = eraseAt(model, { x: 0, y: 10 });
+    model = eraseAt(model, { x: 12, y: 10 });
+    model = endErase(model);
+
+    expect(model.shapes).toHaveLength(0);
+    expect(canUndo(model)).toBe(true);
+
+    model = undo(model);
+    expect(model.shapes).toEqual(beforeErase);
+  });
+
+  it("records nothing for an empty drag", () => {
+    let model = drawStroke(createModel(), verticalStroke(0));
+    const beforeErase = model;
+
+    model = beginErase(model);
+    model = eraseAt(model, { x: 100, y: 100 });
+    model = endErase(model);
+
+    expect(model.shapes).toEqual(beforeErase.shapes);
+    expect(model.undoStack).toBe(beforeErase.undoStack);
+    expect(model.revision).toBe(beforeErase.revision);
+  });
+
+  it("clears redo when an erase actually removes a shape", () => {
+    let model = drawStroke(createModel(), verticalStroke(0));
+    model = drawStroke(model, verticalStroke(12));
+    model = undo(model);
+    expect(canRedo(model)).toBe(true);
+
+    model = beginErase(model);
+    model = eraseAt(model, { x: 0, y: 10 });
+    model = endErase(model);
+
+    expect(canRedo(model)).toBe(false);
   });
 });
 
