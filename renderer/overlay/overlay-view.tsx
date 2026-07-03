@@ -43,6 +43,7 @@ import {
   type Shape,
 } from "./drawing-model";
 import { ephemeralAlpha, pruneExpiredEphemerals } from "./ephemeral-ink";
+import { freehandPathCommands } from "./smooth-path";
 
 interface OverlayWindowState {
   active?: boolean;
@@ -239,13 +240,14 @@ function drawShape(
 
   if (shape.tool === "pen" || shape.tool === "highlighter") {
     ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < pts.length; i++) {
-      ctx.lineTo(pts[i].x, pts[i].y);
-    }
-    if (pts.length === 1) {
-      // Single tap: render a dot.
-      ctx.lineTo(pts[0].x + 0.1, pts[0].y);
+    for (const command of freehandPathCommands(pts)) {
+      if (command.type === "moveTo") {
+        ctx.moveTo(command.point.x, command.point.y);
+      } else if (command.type === "lineTo") {
+        ctx.lineTo(command.point.x, command.point.y);
+      } else {
+        ctx.quadraticCurveTo(command.control.x, command.control.y, command.end.x, command.end.y);
+      }
     }
     ctx.stroke();
   } else if (shape.tool === "text") {

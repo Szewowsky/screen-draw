@@ -9,6 +9,7 @@ All notable changes to Screen Draw are documented here. Feature descriptions liv
 - **Eraser** (`E`): drag across committed strokes or shapes to remove every touched item, coalesced into one undo step per drag.
 - **Text tool** (`X`): click to type a single-line label, commit with Enter or blur, cancel with Escape, then select, move, restyle, delete, undo, and redo it like other annotations.
 - **Board mode** (`W`): cycle the active display between transparent, whiteboard, and blackboard backgrounds; boards are session-only overlay backgrounds and stay out of undo/clear.
+- **Smoother freehand ink**: pen, highlighter, and laser strokes now render with midpoint quadratic smoothing while the model keeps the same raw thinned points for hit-testing and undo.
 
 ## 1.6.5 — 2026-07-03
 
