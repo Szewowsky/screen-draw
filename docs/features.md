@@ -8,7 +8,7 @@ Toggle with the global shortcut (default **⌘⇧D**, configurable in the contro
 
 The overlay and toolbar stay ready while hidden, and the toolbar is shown before macOS app focus is requested. This keeps the app-side activation path short, but activation feel is still verified manually on a physical display: the 1.6.2 automated matrix was green/inconclusive, while owner real-shortcut QA remains the final check after switching between apps.
 
-**Multi-display:** each display has its own canvas — shapes belong to the display they were drawn on. Moving the cursor onto a display makes it active: the toolbar and keyboard shortcuts follow the pointer. Undo/redo apply to the active display. In the control panel's **Toolbar** section, **Toolbar on other displays** chooses whether the toolbar uses the same saved position everywhere (default) or remembers a separate position per display.
+**Multi-display:** each display has its own canvas — shapes belong to the display they were drawn on. Moving the cursor onto a display makes it active: the toolbar and keyboard shortcuts follow the pointer. Undo/redo apply to the active display. In the control panel's **Toolbar** section, **Toolbar on other displays** chooses whether other displays use the primary display's toolbar position and tool settings (tool, color, and size), or keep their own per-display toolbar state.
 
 ## Three states: drawing, pinned, hidden
 
@@ -61,7 +61,7 @@ One `Esc` does the most local thing first:
 
 ## The floating toolbar
 
-A separate always-on-top bar on the active display, draggable by its grip; the position persists across restarts (off-screen positions reset to the default bottom-center). The control panel can keep one shared toolbar position across displays or remember positions per display. In per-display mode, dragging stores the active display's position and `⇧T` clears only that display's saved position; shared mode keeps `⇧T` clearing the shared position.
+A separate always-on-top bar on the active display, draggable by its grip; the position persists across restarts (off-screen positions reset to the default bottom-center). The control panel can keep one shared toolbar position and shared tool settings across displays, or remember toolbar state per display. In per-display mode, dragging stores the active display's position and `⇧T` clears only that display's saved position; shared mode keeps `⇧T` clearing the shared position. Session ink, selections, and canvas history remain per display.
 
 Hover any toolbar control to see its name and shortcut where a shortcut exists.
 
@@ -80,4 +80,4 @@ Screen Draw is a menu-bar app: no Dock icon. The tray (menu bar) icon offers Sho
 
 ## Settings & persistence
 
-Stored in `~/Library/Application Support/Screen Draw/screen-draw-settings.json`: activation shortcut, default color/size, toolbar position scope, shared/per-display toolbar positions, recent colors, and the recordings-hide flag. Old settings files from previous versions load cleanly.
+Stored in `~/Library/Application Support/Screen Draw/screen-draw-settings.json`: activation shortcut, default color/size, toolbar position scope, shared/per-display toolbar positions, recent colors, and the recordings-hide flag. Shared toolbar tool settings are session state carried between displays while drawing. Old settings files from previous versions load cleanly.

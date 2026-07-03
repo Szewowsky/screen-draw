@@ -24,6 +24,7 @@
 import { ipcMain } from "electron";
 
 import { broadcast } from "../services/events.js";
+import { cacheToolbarState, getCachedToolbarState } from "../services/toolbar-state-cache.js";
 import {
   getActiveDisplayId,
   focusActiveOverlay,
@@ -34,9 +35,6 @@ import {
   setToolbarBounds,
   toggleToolbarHidden,
 } from "../windows/toolbar-window.js";
-
-/** Last full toolbar state published by the active overlay; seeds the toolbar on show. */
-let cachedState: Record<string, unknown> = {};
 
 function withWorkArea(state: Record<string, unknown>): Record<string, unknown> {
   const activeDisplayId = getActiveDisplayId();
@@ -50,12 +48,12 @@ function withWorkArea(state: Record<string, unknown>): Record<string, unknown> {
 
 export function registerToolbarHandlers(): void {
   ipcMain.handle("toolbar:publishState", async (_event, state: unknown) => {
-    cachedState = typeof state === "object" && state !== null ? { ...state } : {};
+    const cachedState = cacheToolbarState(state);
     broadcast("toolbar:state", withWorkArea(cachedState));
   });
 
   ipcMain.handle("toolbar:getState", async () => {
-    return withWorkArea(cachedState);
+    return withWorkArea(getCachedToolbarState());
   });
 
   ipcMain.handle("toolbar:setBounds", async (_event, request: unknown) => {

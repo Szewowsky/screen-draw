@@ -378,7 +378,7 @@ export function HomeView() {
 
         <FieldSet
           title="Toolbar"
-          description="Choose how the floating toolbar is placed when drawing moves between displays."
+          description="Choose whether other displays use the primary display's toolbar position and tool settings."
         >
           <Field label="Toolbar on other displays" orientation="vertical">
             <SegmentedControl

@@ -2,6 +2,14 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
+## 1.6.4 — 2026-07-03
+
+### Added
+- **Shared toolbar tool settings.** The control panel's **Same as primary** toolbar scope now carries the active tool, color, and size across displays along with the toolbar position. Per-display mode keeps each display's toolbar state independent.
+
+### Fixed
+- **Toolbar-scope label overflow.** The control-panel labels for the toolbar scope selector no longer overflow their segmented-control buttons (`4d0490d`).
+
 ## 1.6.3 — 2026-07-03
 
 ### Added

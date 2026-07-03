@@ -42,6 +42,13 @@ interface OverlayWindowState {
   latencyActivationId?: string;
 }
 
+interface AdoptToolStatePayload {
+  activeDisplayId?: unknown;
+  tool?: unknown;
+  color?: unknown;
+  size?: unknown;
+}
+
 /**
  * Single-key → tool map for the overlay's keydown handler. Kept local (rather
  * than importing the toolbar's TOOLS list) so the overlay bundle stays free of
@@ -58,8 +65,22 @@ const TOOL_KEYS: Record<string, OverlayTool> = {
   o: "ellipse",
 };
 
+const OVERLAY_TOOLS = new Set<OverlayTool>([
+  "select",
+  "pen",
+  "highlighter",
+  "line",
+  "arrow",
+  "rectangle",
+  "ellipse",
+]);
+
 /** Padding between a selected shape's bounds and the dashed indicator box. */
 const SELECTION_PADDING = 4;
+
+function isOverlayTool(value: unknown): value is OverlayTool {
+  return typeof value === "string" && OVERLAY_TOOLS.has(value as OverlayTool);
+}
 
 function drawSelectionIndicator(ctx: CanvasRenderingContext2D, shape: Shape) {
   const bounds = getBounds(shape);
@@ -537,6 +558,28 @@ export function OverlayView() {
   useEffect(() => {
     publishState();
   }, [publishState]);
+
+  useEffect(() => {
+    const unsub = window.screenDraw.ipc.on("overlay:adoptToolState", (params) => {
+      const payload = (params ?? {}) as AdoptToolStatePayload;
+      const targetDisplayId = normalizeDisplayId(payload.activeDisplayId);
+      const displayId = displayIdRef.current;
+      if (displayId !== null) {
+        if (targetDisplayId !== displayId) return;
+      } else if (!isThisActiveDisplay()) {
+        return;
+      }
+      if (!isOverlayTool(payload.tool)) return;
+      if (typeof payload.color !== "string" || !payload.color.trim()) return;
+      if (typeof payload.size !== "number" || !Number.isFinite(payload.size) || payload.size <= 0) {
+        return;
+      }
+      setTool(payload.tool);
+      setColor(payload.color);
+      setSize(payload.size);
+    });
+    return () => unsub();
+  }, [isThisActiveDisplay]);
 
   // Re-publish when this overlay becomes the active display (so the toolbar
   // shows this overlay's values, not the previously-active one's). Keyed on the

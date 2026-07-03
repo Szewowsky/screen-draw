@@ -12,6 +12,8 @@
 
 import { app, BrowserWindow, globalShortcut, screen, type Display } from "electron";
 import { broadcast } from "../services/events.js";
+import { getSettings } from "../services/settings-store.js";
+import { getAdoptableCachedToolbarState } from "../services/toolbar-state-cache.js";
 import { getPreloadPath, getWindowUrl } from "./window-paths.js";
 import {
   createToolbarWindow,
@@ -113,6 +115,17 @@ function broadcastActiveDisplay(): void {
   broadcast("overlay:active-display-changed", { activeDisplayId });
 }
 
+function adoptSharedToolbarStateForDisplay(
+  displayId: number | null,
+  previousDisplayId: number | null,
+): void {
+  if (displayId === null || previousDisplayId === null || displayId === previousDisplayId) return;
+  if (getSettings().toolbarPositionScope !== "shared") return;
+  const toolbarState = getAdoptableCachedToolbarState();
+  if (!toolbarState) return;
+  broadcast("overlay:adoptToolState", { activeDisplayId: displayId, ...toolbarState });
+}
+
 async function createOverlayWindowForDisplay(display: Display): Promise<BrowserWindow> {
   const existing = overlayWindows.get(display.id);
   if (existing && !existing.isDestroyed()) {
@@ -201,9 +214,7 @@ async function syncOverlayWindows(): Promise<BrowserWindow[]> {
         // In sticky the overlays never take focus (they must not steal it from the
         // app the user is now working in), so every window shows inactive.
         if (mode === "drawing" && display.id === activeDisplayId) {
-          measureWindowOperation("overlay", display.id, "show", "overlayShowMs", () =>
-            win.show(),
-          );
+          measureWindowOperation("overlay", display.id, "show", "overlayShowMs", () => win.show());
         } else {
           measureWindowOperation(
             "overlay",
@@ -313,8 +324,10 @@ export async function setOverlayActiveDisplay(displayId: number): Promise<void> 
     throw new Error(`Unknown display id: ${displayId}`);
   }
 
+  const previousDisplayId = activeDisplayId;
   activeDisplayId = displayId;
   broadcastActiveDisplay();
+  adoptSharedToolbarStateForDisplay(displayId, previousDisplayId);
 
   if (mode === "drawing") {
     await syncOverlayWindows();
@@ -336,8 +349,10 @@ export async function setOverlayActiveDisplay(displayId: number): Promise<void> 
 /** Enter interactive drawing: overlays visible + interactive, toolbar + shortcuts on. */
 async function enterDrawing(options: OverlayActivationOptions): Promise<void> {
   await measureLatencyStageAsync("enterDrawingMs", async () => {
+    const previousDisplayId = activeDisplayId;
     activeDisplayId = getDisplayIdForActivation(options);
     updateLatencyActivation({ activeDisplayId });
+    adoptSharedToolbarStateForDisplay(activeDisplayId, previousDisplayId);
 
     for (const [displayId, win] of overlayWindows) {
       const display = getDisplayById(displayId);
@@ -347,12 +362,8 @@ async function enterDrawing(options: OverlayActivationOptions): Promise<void> {
       if (displayId === activeDisplayId) {
         measureWindowOperation("overlay", displayId, "show", "overlayShowMs", () => win.show());
       } else {
-        measureWindowOperation(
-          "overlay",
-          displayId,
-          "showInactive",
-          "overlayShowInactiveMs",
-          () => win.showInactive(),
+        measureWindowOperation("overlay", displayId, "showInactive", "overlayShowInactiveMs", () =>
+          win.showInactive(),
         );
       }
       // macOS can re-constrain the frame while showing (nudging it below the
