@@ -23,6 +23,7 @@ export interface Shape {
   color: string;
   size: number;
   points: readonly Point[];
+  text?: string;
 }
 
 /** Maximum number of undoable operations kept in history (oldest evicted first). */
@@ -129,6 +130,7 @@ export function startShape(
 export function updateShape(model: DrawingModel, point: Point, shift: boolean): DrawingModel {
   const current = model.current;
   if (!current) return model;
+  if (current.tool === "text") return model;
   const start = current.points[0];
   let points: readonly Point[];
   if (current.tool === "pen" || current.tool === "highlighter") {
@@ -174,6 +176,30 @@ export function commitShape(model: DrawingModel): DrawingModel {
     ...model,
     shapes: [...model.shapes, model.current],
     current: null,
+    undoStack: pushHistory(model.undoStack, model.shapes),
+    redoStack: [],
+    revision: model.revision + 1,
+  };
+}
+
+export function addText(
+  model: DrawingModel,
+  options: { color: string; size: number; text: string },
+  point: Point,
+): DrawingModel {
+  if (model.drag || model.eraseDrag || options.text.length === 0) return model;
+  const shape: Shape = {
+    tool: "text",
+    color: options.color,
+    size: options.size,
+    points: [point],
+    text: options.text,
+  };
+  return {
+    ...model,
+    shapes: [...model.shapes, shape],
+    current: null,
+    selectedIndex: null,
     undoStack: pushHistory(model.undoStack, model.shapes),
     redoStack: [],
     revision: model.revision + 1,
@@ -435,10 +461,38 @@ export interface Bounds {
   maxY: number;
 }
 
+export interface TextMeasure {
+  width: number;
+  height: number;
+}
+
+export type MeasureText = (text: string, fontPx: number) => TextMeasure;
+
+export function textFontPx(size: number): number {
+  return 8 + size * 3;
+}
+
+const DEFAULT_TEXT_MEASURE: MeasureText = (text, fontPx) => ({
+  width: text.length * fontPx * 0.6,
+  height: fontPx,
+});
+
 /** Axis-aligned bounding box of a shape's painted extent (stroke width included). */
-export function getBounds(shape: Shape): Bounds | null {
+export function getBounds(shape: Shape, measureText: MeasureText = DEFAULT_TEXT_MEASURE): Bounds | null {
   const pts = shape.points;
   if (pts.length === 0) return null;
+  if (shape.tool === "text") {
+    const text = shape.text ?? "";
+    if (text.length === 0) return null;
+    const anchor = pts[0];
+    const measured = measureText(text, textFontPx(shape.size));
+    return {
+      minX: anchor.x,
+      minY: anchor.y,
+      maxX: anchor.x + measured.width,
+      maxY: anchor.y + measured.height,
+    };
+  }
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -521,9 +575,23 @@ export function endErase(model: DrawingModel): DrawingModel {
 const ELLIPSE_HIT_SAMPLES = 64;
 
 /** Whether `point` hits the painted outline of `shape` (stroke width + tolerance). */
-export function hitsShape(shape: Shape, point: Point): boolean {
+export function hitsShape(
+  shape: Shape,
+  point: Point,
+  measureText: MeasureText = DEFAULT_TEXT_MEASURE,
+): boolean {
   const pts = shape.points;
   if (pts.length === 0) return false;
+  if (shape.tool === "text") {
+    const bounds = getBounds(shape, measureText);
+    return (
+      bounds !== null &&
+      point.x >= bounds.minX &&
+      point.x <= bounds.maxX &&
+      point.y >= bounds.minY &&
+      point.y <= bounds.maxY
+    );
+  }
   const radius = strokeWidth(shape) / 2 + HIT_TOLERANCE;
   const a = pts[0];
   const b = pts[pts.length - 1];
@@ -562,9 +630,13 @@ export function hitsShape(shape: Shape, point: Point): boolean {
 }
 
 /** Index of the topmost shape hit at `point`, or null. */
-export function hitTest(shapes: readonly Shape[], point: Point): number | null {
+export function hitTest(
+  shapes: readonly Shape[],
+  point: Point,
+  measureText: MeasureText = DEFAULT_TEXT_MEASURE,
+): number | null {
   for (let i = shapes.length - 1; i >= 0; i--) {
-    if (hitsShape(shapes[i], point)) return i;
+    if (hitsShape(shapes[i], point, measureText)) return i;
   }
   return null;
 }

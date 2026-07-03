@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   HISTORY_LIMIT,
+  addText,
+  beginDrag,
   canRedo,
   canUndo,
   clearAll,
@@ -8,16 +10,24 @@ import {
   constrainPoint,
   createModel,
   beginErase,
+  deleteSelected,
   discardCurrent,
+  endDrag,
   endErase,
   eraseAt,
   getBounds,
+  hitsShape,
   MIN_POINT_DISTANCE,
   redo,
+  restyleSelected,
+  selectShape,
   startShape,
   undo,
+  updateDrag,
   updateShape,
+  textFontPx,
   type DrawingModel,
+  type MeasureText,
   type Point,
   type Shape,
 } from "../renderer/overlay/drawing-model";
@@ -343,6 +353,59 @@ describe("eraser transitions", () => {
     model = endErase(model);
 
     expect(canRedo(model)).toBe(false);
+  });
+});
+
+describe("text shapes", () => {
+  const measureText: MeasureText = (text, fontPx) => {
+    expect(text).toBe("Hello");
+    expect(fontPx).toBe(textFontPx(4));
+    return { width: 42, height: 18 };
+  };
+
+  it("commits text as an undoable shape", () => {
+    let model = addText(createModel(), { color: "#FF3B30", size: 4, text: "Hello" }, { x: 5, y: 6 });
+
+    expect(model.shapes).toEqual([
+      { tool: "text", color: "#FF3B30", size: 4, text: "Hello", points: [{ x: 5, y: 6 }] },
+    ]);
+    expect(canUndo(model)).toBe(true);
+
+    model = undo(model);
+    expect(model.shapes).toEqual([]);
+  });
+
+  it("uses injected measurement for text bounds and hits", () => {
+    const model = addText(createModel(), { color: "#FF3B30", size: 4, text: "Hello" }, { x: 5, y: 6 });
+    const shape = model.shapes[0];
+
+    expect(getBounds(shape, measureText)).toEqual({ minX: 5, minY: 6, maxX: 47, maxY: 24 });
+    expect(hitsShape(shape, { x: 46, y: 23 }, measureText)).toBe(true);
+    expect(hitsShape(shape, { x: 48, y: 23 }, measureText)).toBe(false);
+  });
+
+  it("moves, restyles, deletes, and restores text through existing transitions", () => {
+    let model = addText(createModel(), { color: "#FF3B30", size: 4, text: "Hello" }, { x: 5, y: 6 });
+    model = selectShape(model, 0);
+    model = beginDrag(model, { x: 5, y: 6 });
+    model = updateDrag(model, { x: 15, y: 16 });
+    model = endDrag(model);
+    expect(model.shapes[0]).toMatchObject({
+      tool: "text",
+      text: "Hello",
+      color: "#FF3B30",
+      size: 4,
+      points: [{ x: 15, y: 16 }],
+    });
+
+    model = restyleSelected(model, { color: "#0A84FF", size: 8 });
+    expect(model.shapes[0]).toMatchObject({ text: "Hello", color: "#0A84FF", size: 8 });
+
+    model = deleteSelected(model);
+    expect(model.shapes).toEqual([]);
+
+    model = undo(model);
+    expect(model.shapes[0]).toMatchObject({ tool: "text", text: "Hello" });
   });
 });
 
