@@ -2,6 +2,11 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
+## 1.6.5 — 2026-07-03
+
+### Added
+- **Shared session ink.** The control panel's **Same as primary** toolbar scope now shares session ink (`G` / ghost button) across displays along with toolbar position, tool, color, and size. With shared session ink on, a full exit wipes every display's canvas; per-display scope keeps `G` affecting only the active display.
+
 ## 1.6.4 — 2026-07-03
 
 ### Added

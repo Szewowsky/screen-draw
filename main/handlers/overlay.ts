@@ -23,6 +23,7 @@ import {
   setOverlayActive,
   setOverlayActiveDisplay,
   setOverlaySticky,
+  toggleOverlayVanishing,
 } from "../windows/overlay-window.js";
 import { applyContentProtection } from "../windows/toolbar-window.js";
 
@@ -64,6 +65,11 @@ export function registerOverlayHandlers(): void {
       throw new Error("overlay:setActiveDisplay expects a display id");
     }
     await setOverlayActiveDisplay(displayId);
+    return overlayState();
+  });
+
+  ipcMain.handle("overlay:toggleVanishing", async () => {
+    toggleOverlayVanishing();
     return overlayState();
   });
 

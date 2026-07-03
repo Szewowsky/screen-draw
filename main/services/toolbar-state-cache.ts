@@ -2,6 +2,7 @@ export type AdoptableToolbarState = {
   tool: "select" | "pen" | "highlighter" | "line" | "arrow" | "rectangle" | "ellipse";
   color: string;
   size: number;
+  vanishing?: boolean;
 };
 
 const ADOPTABLE_TOOLS = new Set<AdoptableToolbarState["tool"]>([
@@ -29,7 +30,12 @@ export function pickAdoptableToolbarState(raw: unknown): AdoptableToolbarState |
   if (!isAdoptableTool(raw.tool)) return null;
   if (typeof raw.color !== "string" || !raw.color.trim()) return null;
   if (typeof raw.size !== "number" || !Number.isFinite(raw.size) || raw.size <= 0) return null;
-  return { tool: raw.tool, color: raw.color, size: raw.size };
+  return {
+    tool: raw.tool,
+    color: raw.color,
+    size: raw.size,
+    ...(typeof raw.vanishing === "boolean" ? { vanishing: raw.vanishing } : {}),
+  };
 }
 
 export function cacheToolbarState(raw: unknown): Record<string, unknown> {
@@ -43,4 +49,13 @@ export function getCachedToolbarState(): Record<string, unknown> {
 
 export function getAdoptableCachedToolbarState(): AdoptableToolbarState | null {
   return pickAdoptableToolbarState(cachedToolbarState);
+}
+
+export function getCachedToolbarVanishing(): boolean {
+  return cachedToolbarState.vanishing === true;
+}
+
+export function setCachedToolbarVanishing(vanishing: boolean): Record<string, unknown> {
+  cachedToolbarState = { ...cachedToolbarState, vanishing };
+  return cachedToolbarState;
 }

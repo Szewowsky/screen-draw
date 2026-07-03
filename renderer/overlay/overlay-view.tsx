@@ -47,6 +47,12 @@ interface AdoptToolStatePayload {
   tool?: unknown;
   color?: unknown;
   size?: unknown;
+  vanishing?: unknown;
+}
+
+interface SetVanishingPayload {
+  activeDisplayId?: unknown;
+  vanishing?: unknown;
 }
 
 /**
@@ -406,10 +412,8 @@ export function OverlayView() {
     applyModel(modelClearAll(modelRef.current));
   }, [applyModel]);
 
-  const toggleVanishing = useCallback(() => {
-    // Toggling only flips the mode; drawn shapes stay untouched. The flag is
-    // consulted only on a full exit, where it decides whether to wipe the model.
-    setVanishing((v) => !v);
+  const requestVanishingToggle = useCallback(() => {
+    void window.screenDraw.ipc.invoke("overlay:toggleVanishing");
   }, []);
 
   const exit = useCallback(() => {
@@ -511,10 +515,9 @@ export function OverlayView() {
   // The listener is intentionally NOT gated on isThisActiveDisplay, so EVERY
   // display's overlay reacts. Each overlay decides the wipe from its OWN
   // `vanishingRef` (read via the ref so a `G` toggle never re-subscribes this
-  // effect). A `G` toggle only reaches the active display's overlay (the
-  // toolbar:action gate), so on multi-display setups only that overlay's flag is
-  // set — per-display consistency follows the toolbar's per-display toggling.
-  // Single-display users never notice.
+  // effect). In shared toolbar scope the main process sets that flag on every
+  // overlay; in per-display scope it sets only the active display, preserving
+  // the earlier one-display wipe semantics.
   useEffect(() => {
     const unsub = window.screenDraw.ipc.on("overlay:active-changed", (params) => {
       const p = (params as OverlayWindowState | undefined) ?? {};
@@ -577,6 +580,25 @@ export function OverlayView() {
       setTool(payload.tool);
       setColor(payload.color);
       setSize(payload.size);
+      if (typeof payload.vanishing === "boolean") setVanishing(payload.vanishing);
+    });
+    return () => unsub();
+  }, [isThisActiveDisplay]);
+
+  useEffect(() => {
+    const unsub = window.screenDraw.ipc.on("overlay:setVanishing", (params) => {
+      const payload = (params ?? {}) as SetVanishingPayload;
+      if (typeof payload.vanishing !== "boolean") return;
+      if ("activeDisplayId" in payload) {
+        const targetDisplayId = normalizeDisplayId(payload.activeDisplayId);
+        const displayId = displayIdRef.current;
+        if (displayId !== null) {
+          if (targetDisplayId !== displayId) return;
+        } else if (!isThisActiveDisplay()) {
+          return;
+        }
+      }
+      setVanishing(payload.vanishing);
     });
     return () => unsub();
   }, [isThisActiveDisplay]);
@@ -655,7 +677,7 @@ export function OverlayView() {
           exit();
           break;
         case "toggleVanishing":
-          toggleVanishing();
+          requestVanishingToggle();
           break;
       }
     });
@@ -669,7 +691,7 @@ export function OverlayView() {
     redo,
     clearAll,
     exit,
-    toggleVanishing,
+    requestVanishingToggle,
   ]);
 
   // Canvas setup + pointer + keyboard handlers.
@@ -816,7 +838,7 @@ export function OverlayView() {
       // G toggles session ink.
       if (key === "g") {
         e.preventDefault();
-        toggleVanishing();
+        requestVanishingToggle();
         return;
       }
 
@@ -883,7 +905,7 @@ export function OverlayView() {
     clearAll,
     selectThisDisplay,
     changeTool,
-    toggleVanishing,
+    requestVanishingToggle,
   ]);
 
   return (

@@ -8,7 +8,7 @@ Toggle with the global shortcut (default **⌘⇧D**, configurable in the contro
 
 The overlay and toolbar stay ready while hidden, and the toolbar is shown before macOS app focus is requested. This keeps the app-side activation path short, but activation feel is still verified manually on a physical display: the 1.6.2 automated matrix was green/inconclusive, while owner real-shortcut QA remains the final check after switching between apps.
 
-**Multi-display:** each display has its own canvas — shapes belong to the display they were drawn on. Moving the cursor onto a display makes it active: the toolbar and keyboard shortcuts follow the pointer. Undo/redo apply to the active display. In the control panel's **Toolbar** section, **Toolbar on other displays** chooses whether other displays use the primary display's toolbar position and tool settings (tool, color, and size), or keep their own per-display toolbar state.
+**Multi-display:** each display has its own canvas — shapes belong to the display they were drawn on. Moving the cursor onto a display makes it active: the toolbar and keyboard shortcuts follow the pointer. Undo/redo apply to the active display. In the control panel's **Toolbar** section, **Toolbar on other displays** chooses whether other displays use the primary display's toolbar position, tool settings (tool, color, and size), and session ink, or keep their own per-display toolbar state.
 
 ## Three states: drawing, pinned, hidden
 
@@ -42,7 +42,9 @@ Brush size: `[` / `]` or the toolbar slider (1–24 px).
 
 ## Session ink („duszek") — `G`
 
-Toggle with the ghost button in the toolbar or `G`. While it's on, **drawing works exactly like normal** — every stroke commits to the canvas and is selectable (`V`), restylable, movable, deletable, and fully undoable/redoable with `⌘Z`. The only difference: when you **fully exit** drawing (`Esc`, **Stop drawing**, or the global toggle) with session ink on, the canvas **and** undo history reset to a clean slate, so the next time you start drawing you begin fresh. **Pinning (`S`) does not wipe** — pinned annotations stay on screen. Turn session ink off and everything persists across hide/show exactly as it always has. The toggle is remembered for the whole app session.
+Toggle with the ghost button in the toolbar or `G`. While it's on, **drawing works exactly like normal** — every stroke commits to the canvas and is selectable (`V`), restylable, movable, deletable, and fully undoable/redoable with `⌘Z`. The only difference: when you **fully exit** drawing (`Esc`, **Stop drawing**, or the global toggle) with session ink on, the canvas **and** undo history reset to a clean slate, so the next time you start drawing you begin fresh. **Pinning (`S`) does not wipe** — pinned annotations stay on screen. Turn session ink off and everything persists across hide/show exactly as it always has.
+
+The **Toolbar on other displays** setting controls the session-ink scope. **Same as primary** shares session ink across all displays; if it is on when you fully exit drawing, every display's canvas and undo history are wiped. **Per display** keeps the old behavior: `G` affects only the active display, and only displays with session ink on wipe on full exit.
 
 Made for live streams and tutorials: annotate freely during a segment, then just stop drawing to wipe the slate before the next one — no manual clearing, and everything stays editable while you work.
 
@@ -61,7 +63,7 @@ One `Esc` does the most local thing first:
 
 ## The floating toolbar
 
-A separate always-on-top bar on the active display, draggable by its grip; the position persists across restarts (off-screen positions reset to the default bottom-center). The control panel can keep one shared toolbar position and shared tool settings across displays, or remember toolbar state per display. In per-display mode, dragging stores the active display's position and `⇧T` clears only that display's saved position; shared mode keeps `⇧T` clearing the shared position. Session ink, selections, and canvas history remain per display.
+A separate always-on-top bar on the active display, draggable by its grip; the position persists across restarts (off-screen positions reset to the default bottom-center). The control panel can keep one shared toolbar position, shared tool settings, and shared session ink across displays, or remember toolbar state per display. In per-display mode, dragging stores the active display's position and `⇧T` clears only that display's saved position; shared mode keeps `⇧T` clearing the shared position. Selections, canvas contents, and undo history always remain per display.
 
 Hover any toolbar control to see its name and shortcut where a shortcut exists.
 
@@ -80,4 +82,4 @@ Screen Draw is a menu-bar app: no Dock icon. The tray (menu bar) icon offers Sho
 
 ## Settings & persistence
 
-Stored in `~/Library/Application Support/Screen Draw/screen-draw-settings.json`: activation shortcut, default color/size, toolbar position scope, shared/per-display toolbar positions, recent colors, and the recordings-hide flag. Shared toolbar tool settings are session state carried between displays while drawing. Old settings files from previous versions load cleanly.
+Stored in `~/Library/Application Support/Screen Draw/screen-draw-settings.json`: activation shortcut, default color/size, toolbar position scope, shared/per-display toolbar positions, recent colors, and the recordings-hide flag. Shared toolbar tool settings and session ink are session state carried between displays while drawing. Old settings files from previous versions load cleanly.

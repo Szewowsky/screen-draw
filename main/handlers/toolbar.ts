@@ -29,6 +29,7 @@ import {
   getActiveDisplayId,
   focusActiveOverlay,
   setOverlaySticky,
+  toggleOverlayVanishing,
 } from "../windows/overlay-window.js";
 import {
   getActiveWorkArea,
@@ -86,6 +87,12 @@ export function registerToolbarHandlers(): void {
     // selection / in-progress stroke off the active-changed broadcast.
     if (type === "pin") {
       await setOverlaySticky();
+      return;
+    }
+
+    if (type === "toggleVanishing") {
+      focusActiveOverlay();
+      toggleOverlayVanishing();
       return;
     }
 

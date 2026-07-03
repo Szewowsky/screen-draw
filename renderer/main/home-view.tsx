@@ -378,7 +378,7 @@ export function HomeView() {
 
         <FieldSet
           title="Toolbar"
-          description="Choose whether other displays use the primary display's toolbar position and tool settings."
+          description="Choose whether other displays use the primary display's toolbar position, tool settings, and session ink."
         >
           <Field label="Toolbar on other displays" orientation="vertical">
             <SegmentedControl

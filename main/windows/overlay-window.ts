@@ -13,7 +13,11 @@
 import { app, BrowserWindow, globalShortcut, screen, type Display } from "electron";
 import { broadcast } from "../services/events.js";
 import { getSettings } from "../services/settings-store.js";
-import { getAdoptableCachedToolbarState } from "../services/toolbar-state-cache.js";
+import {
+  getAdoptableCachedToolbarState,
+  getCachedToolbarVanishing,
+  setCachedToolbarVanishing,
+} from "../services/toolbar-state-cache.js";
 import { getPreloadPath, getWindowUrl } from "./window-paths.js";
 import {
   createToolbarWindow,
@@ -344,6 +348,16 @@ export async function setOverlayActiveDisplay(displayId: number): Promise<void> 
   }
 
   logger.info("overlay", `Active drawing display changed to ${displayId}`);
+}
+
+export function toggleOverlayVanishing(): void {
+  const vanishing = !getCachedToolbarVanishing();
+  setCachedToolbarVanishing(vanishing);
+  if (getSettings().toolbarPositionScope === "shared") {
+    broadcast("overlay:setVanishing", { vanishing });
+    return;
+  }
+  broadcast("overlay:setVanishing", { activeDisplayId, vanishing });
 }
 
 /** Enter interactive drawing: overlays visible + interactive, toolbar + shortcuts on. */
