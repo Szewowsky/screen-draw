@@ -2,6 +2,11 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
+## Unreleased
+
+### Fixed
+- **Text caret focus.** The Text tool now explicitly returns focus to the overlay input when the caret is placed, so typing can start immediately after clicking the screen.
+
 ## 1.7.1 — 2026-07-04
 
 ### Fixed

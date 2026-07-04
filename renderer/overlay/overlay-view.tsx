@@ -189,7 +189,10 @@ function drawArrowHead(ctx: CanvasRenderingContext2D, from: Point, to: Point, si
   ctx.stroke();
 }
 
-function strokeFreehandPath(ctx: CanvasRenderingContext2D, commands: readonly FreehandPathCommand[]) {
+function strokeFreehandPath(
+  ctx: CanvasRenderingContext2D,
+  commands: readonly FreehandPathCommand[],
+) {
   ctx.beginPath();
   for (const command of commands) {
     if (command.type === "moveTo") {
@@ -281,6 +284,7 @@ export function OverlayView() {
   const laserStrokesRef = useRef<LaserStroke[]>([]);
   const activeLaserStrokeRef = useRef<LaserStroke | null>(null);
   const textInputRef = useRef<TextInputState | null>(null);
+  const textInputElementRef = useRef<HTMLInputElement | null>(null);
   const textInputOpenRef = useRef(false);
   const resolvedTextInputsRef = useRef<WeakSet<TextInputState>>(new WeakSet());
   const textMeasureCacheRef = useRef<Map<string, { width: number; height: number }>>(new Map());
@@ -413,11 +417,7 @@ export function OverlayView() {
           glow: true,
         });
       }
-      if (
-        stroke.endedAt !== null &&
-        now - stroke.endedAt > EPHEMERAL_HOLD_MS &&
-        alpha > 0
-      ) {
+      if (stroke.endedAt !== null && now - stroke.endedAt > EPHEMERAL_HOLD_MS && alpha > 0) {
         hasFadingLaserStroke = true;
       }
     }
@@ -521,6 +521,25 @@ export function OverlayView() {
     void window.screenDraw.ipc.invoke("overlay:textInputOpen", open);
   }, []);
 
+  const focusTextInputElement = useCallback((element = textInputElementRef.current) => {
+    element?.focus({ preventScroll: true });
+  }, []);
+
+  const setTextInputElement = useCallback(
+    (element: HTMLInputElement | null) => {
+      textInputElementRef.current = element;
+      if (element) focusTextInputElement(element);
+    },
+    [focusTextInputElement],
+  );
+
+  useEffect(() => {
+    if (!textInputIsOpen) return;
+    const focusInput = () => focusTextInputElement();
+    window.addEventListener("focus", focusInput);
+    return () => window.removeEventListener("focus", focusInput);
+  }, [focusTextInputElement, textInputIsOpen]);
+
   useEffect(() => {
     setTextInputOpen(textInputIsOpen);
   }, [setTextInputOpen, textInputIsOpen]);
@@ -534,14 +553,11 @@ export function OverlayView() {
     [scheduleRedraw],
   );
 
-  const cancelTextInput = useCallback(
-    (state: TextInputState | null = textInputRef.current) => {
-      if (!state || resolvedTextInputsRef.current.has(state)) return;
-      resolvedTextInputsRef.current.add(state);
-      if (textInputRef.current === state) setTextInput(null);
-    },
-    [],
-  );
+  const cancelTextInput = useCallback((state: TextInputState | null = textInputRef.current) => {
+    if (!state || resolvedTextInputsRef.current.has(state)) return;
+    resolvedTextInputsRef.current.add(state);
+    if (textInputRef.current === state) setTextInput(null);
+  }, []);
 
   const commitTextInput = useCallback(
     (state: TextInputState) => {
@@ -560,12 +576,15 @@ export function OverlayView() {
     [applyModel],
   );
 
-  const resolveTextInput = useCallback((state: TextInputState | null = textInputRef.current) => {
-    const current = state;
-    if (!current) return;
-    if (current.value.length === 0) cancelTextInput(current);
-    else commitTextInput(current);
-  }, [cancelTextInput, commitTextInput]);
+  const resolveTextInput = useCallback(
+    (state: TextInputState | null = textInputRef.current) => {
+      const current = state;
+      if (!current) return;
+      if (current.value.length === 0) cancelTextInput(current);
+      else commitTextInput(current);
+    },
+    [cancelTextInput, commitTextInput],
+  );
 
   const changeTool = useCallback(
     (next: OverlayTool) => {
@@ -959,9 +978,22 @@ export function OverlayView() {
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
       selectThisDisplay();
-      canvas.setPointerCapture(e.pointerId);
       const activeTool = toolRef.current;
       const p = toPoint(e);
+      if (activeTool === "text") {
+        e.preventDefault();
+        drawingRef.current = false;
+        resolveTextInput();
+        applyModel(selectShape(modelRef.current, null));
+        setTextInput({
+          anchor: p,
+          color: colorRef.current,
+          size: sizeRef.current,
+          value: "",
+        });
+        return;
+      }
+      canvas.setPointerCapture(e.pointerId);
       if (activeTool === "select") {
         // Click selects the topmost hit shape (and arms a drag) or deselects.
         const model = modelRef.current;
@@ -979,18 +1011,6 @@ export function OverlayView() {
       if (activeTool === "eraser") {
         drawingRef.current = true;
         applyModel(eraseAt(beginErase(modelRef.current), p, measureTextForCanvas));
-        return;
-      }
-      if (activeTool === "text") {
-        drawingRef.current = false;
-        resolveTextInput();
-        applyModel(selectShape(modelRef.current, null));
-        setTextInput({
-          anchor: p,
-          color: colorRef.current,
-          size: sizeRef.current,
-          value: "",
-        });
         return;
       }
       applyModel(
@@ -1246,6 +1266,7 @@ export function OverlayView() {
       />
       {textInput ? (
         <input
+          ref={setTextInputElement}
           type="text"
           autoFocus
           value={textInput.value}

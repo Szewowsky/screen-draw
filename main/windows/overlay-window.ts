@@ -304,8 +304,18 @@ export function focusActiveOverlay(): void {
 export async function setOverlayTextInputOpen(open: boolean): Promise<void> {
   textInputOpen = open;
   if (mode !== "drawing") return;
-  if (open) unregisterDrawingShortcuts();
-  else await registerDrawingShortcuts();
+  if (open) {
+    unregisterDrawingShortcuts();
+    if (activeDisplayId !== null) {
+      const win = overlayWindows.get(activeDisplayId);
+      if (win && !win.isDestroyed()) {
+        app.focus({ steal: true });
+        win.focus();
+      }
+    }
+  } else {
+    await registerDrawingShortcuts();
+  }
 }
 
 function cancelDeferredOverlayFocus(): void {
