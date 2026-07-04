@@ -329,6 +329,7 @@ export function HomeView() {
   const cursorHighlightEnabled = settings?.cursorHighlight.enabled ?? false;
   const spotlightEnabled = settings?.spotlight.enabled ?? false;
   const openAtLogin = openAtLoginState?.openAtLogin ?? false;
+  const openAtLoginLoading = openAtLoginState === undefined;
   const openAtLoginAvailable = openAtLoginState?.available === true;
   const failedEffectShortcut =
     effectsShortcutStatus?.highlight.failedAccelerator ??
@@ -370,17 +371,17 @@ export function HomeView() {
         <FieldSet title="General">
           <Field label="Launch at login">
             <div className="flex min-w-0 items-center gap-3">
+              {!openAtLoginAvailable && !openAtLoginLoading ? (
+                <Text variant="small" color="tertiary" className="text-right leading-tight">
+                  Available in the installed app
+                </Text>
+              ) : null}
               <Switch
                 checked={openAtLogin}
                 disabled={!openAtLoginAvailable}
                 onCheckedChange={applyOpenAtLogin}
                 aria-label="Launch at login"
               />
-              {!openAtLoginAvailable ? (
-                <Text variant="small" color="tertiary">
-                  Available in the installed app
-                </Text>
-              ) : null}
             </div>
           </Field>
         </FieldSet>

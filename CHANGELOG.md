@@ -2,6 +2,11 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
+## 1.8.2 — 2026-07-04
+
+### Fixed
+- **Launch at login row polish.** The Launch at login switch now stays quiet while its initial state is still loading, so the installed app no longer flashes the "Available in the installed app" hint for a moment when the control panel opens or regains focus — the hint is reserved for development builds, where the feature really is unavailable. The switch also keeps its shape at the panel's narrow width instead of being squashed by the hint text beside it, and the hint stays compact so the row sits flush with the other settings.
+
 ## 1.8.1 — 2026-07-04
 
 ### Added

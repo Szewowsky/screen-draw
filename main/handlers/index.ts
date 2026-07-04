@@ -27,7 +27,7 @@ type OpenAtLoginState = {
 
 function getOpenAtLoginState(): OpenAtLoginState {
   if (!app.isPackaged) {
-    logger.info("app", "Launch at login unavailable: !app.isPackaged");
+    logger.debug("app", "Launch at login unavailable: !app.isPackaged");
     return { openAtLogin: false, available: false };
   }
 

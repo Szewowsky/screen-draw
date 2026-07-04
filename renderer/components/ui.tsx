@@ -105,7 +105,7 @@ export function Switch({
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
       className={clsx(
-        "no-drag relative h-7 w-12 rounded-full border border-white/10 transition disabled:cursor-not-allowed disabled:opacity-50",
+        "no-drag relative h-7 w-12 shrink-0 rounded-full border border-white/10 transition disabled:cursor-not-allowed disabled:opacity-50",
         checked ? "bg-orange-500" : "bg-[#2a2a2a]",
       )}
     >
