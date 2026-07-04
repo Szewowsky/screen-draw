@@ -92,6 +92,8 @@ The control panel's **Presenter effects** section and the tray menu include swit
 
 Cursor highlight paints a translucent ring around the pointer. It works while drawing and while Screen Draw is otherwise hidden in effects-only mode. The Settings window includes cursor highlight controls for color, diameter, and opacity.
 
+Spotlight dims the display outside a feathered circle around the pointer. It can run by itself or under cursor highlight, and the Settings window includes controls for radius and dim amount.
+
 ## App presence
 
 Screen Draw is a menu-bar app: no Dock icon. The tray (menu bar) icon offers Show Control Panel, Toggle Drawing, Cursor Highlight, Spotlight, Settings…, and Quit.

@@ -166,6 +166,46 @@ function drawCursorHighlight(
   ctx.restore();
 }
 
+function drawSpotlight(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  settings: ScreenDrawSettings["spotlight"] | null,
+  cursor: CursorEffectState | null,
+) {
+  if (!settings?.enabled || !cursor) return;
+  const dpr = window.devicePixelRatio || 1;
+  const width = canvas.width / dpr;
+  const height = canvas.height / dpr;
+  const radius = settings.radius;
+  const feather = Math.max(18, radius * 0.18);
+  const outerRadius = radius + feather;
+  const dim = settings.dimOpacity;
+
+  ctx.save();
+  ctx.fillStyle = `rgba(0, 0, 0, ${dim})`;
+  ctx.beginPath();
+  ctx.rect(0, 0, width, height);
+  ctx.moveTo(cursor.x + outerRadius, cursor.y);
+  ctx.arc(cursor.x, cursor.y, outerRadius, 0, Math.PI * 2);
+  ctx.fill("evenodd");
+
+  const gradient = ctx.createRadialGradient(
+    cursor.x,
+    cursor.y,
+    radius,
+    cursor.x,
+    cursor.y,
+    outerRadius,
+  );
+  gradient.addColorStop(0, "rgba(0, 0, 0, 0)");
+  gradient.addColorStop(1, `rgba(0, 0, 0, ${dim})`);
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(cursor.x, cursor.y, outerRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function getOverlayDisplayId(): number | null {
   const value = new URLSearchParams(window.location.search).get("displayId");
   if (value === null) return null;
@@ -324,6 +364,7 @@ export function OverlayView() {
   const displayIdRef = useRef(getOverlayDisplayId());
   const cursorEffectRef = useRef<CursorEffectState | null>(null);
   const cursorHighlightRef = useRef<ScreenDrawSettings["cursorHighlight"] | null>(null);
+  const spotlightRef = useRef<ScreenDrawSettings["spotlight"] | null>(null);
 
   const [tool, setTool] = useState<OverlayTool>("pen");
   const [color, setColor] = useState(PALETTE[0].value);
@@ -400,6 +441,7 @@ export function OverlayView() {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.restore();
+      drawSpotlight(ctx, canvas, spotlightRef.current, cursorEffectRef.current);
       drawCursorHighlight(ctx, cursorHighlightRef.current, cursorEffectRef.current);
       return false;
     }
@@ -474,6 +516,7 @@ export function OverlayView() {
       if (model.drag) drawShape(ctx, selected);
       drawSelectionIndicator(ctx, selected, measureTextForCanvas);
     }
+    drawSpotlight(ctx, canvas, spotlightRef.current, cursorEffectRef.current);
     drawCursorHighlight(ctx, cursorHighlightRef.current, cursorEffectRef.current);
     return hasFadingLaserStroke;
   }, [measureTextForCanvas]);
@@ -745,6 +788,7 @@ export function OverlayView() {
         setSize(next.defaultSize);
       }
       cursorHighlightRef.current = next.cursorHighlight;
+      spotlightRef.current = next.spotlight;
       setRecentColors(Array.isArray(next?.recentColors) ? next.recentColors : []);
       scheduleRedraw();
       prev = next;

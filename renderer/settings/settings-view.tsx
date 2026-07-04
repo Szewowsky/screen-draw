@@ -31,11 +31,18 @@ const DEFAULT_CURSOR_HIGHLIGHT: ScreenDrawSettings["cursorHighlight"] = {
   opacity: 0.35,
 };
 
+const DEFAULT_SPOTLIGHT: ScreenDrawSettings["spotlight"] = {
+  enabled: false,
+  radius: 180,
+  dimOpacity: 0.55,
+};
+
 export function SettingsView() {
   const [themeInfo, setThemeInfo] = useState<NativeThemeInfo | null>(null);
   const [_isLoading, setIsLoading] = useState(true);
   const [hideToolbarInRecordings, setHideToolbarInRecordings] = useState(false);
   const [cursorHighlight, setCursorHighlight] = useState(DEFAULT_CURSOR_HIGHLIGHT);
+  const [spotlight, setSpotlight] = useState(DEFAULT_SPOTLIGHT);
 
   // Close settings window on Escape, unless an interactive element is focused or a popover is open
   useEffect(() => {
@@ -86,6 +93,7 @@ export function SettingsView() {
     const applySettings = (settings: ScreenDrawSettings) => {
       setHideToolbarInRecordings(settings.hideToolbarInRecordings === true);
       setCursorHighlight(settings.cursorHighlight ?? DEFAULT_CURSOR_HIGHLIGHT);
+      setSpotlight(settings.spotlight ?? DEFAULT_SPOTLIGHT);
     };
 
     void window.screenDraw.ipc
@@ -132,6 +140,16 @@ export function SettingsView() {
     },
     [],
   );
+
+  const updateSpotlight = useCallback((partial: Partial<ScreenDrawSettings["spotlight"]>) => {
+    setSpotlight((current) => ({ ...current, ...partial }));
+    void window.screenDraw.ipc
+      .invoke<ScreenDrawSettings>("settings:setDefaults", {
+        spotlight: partial,
+      })
+      .then((settings) => setSpotlight(settings.spotlight))
+      .catch((error) => toast.error(`Failed to update spotlight: ${error}`));
+  }, []);
 
   return (
     <ScrollArea
@@ -253,6 +271,59 @@ export function SettingsView() {
                 endContent={(value) => <span className="tabular-nums">{value}%</span>}
                 endContentClassName="min-w-14"
                 aria-label="Cursor highlight opacity"
+              />
+            </Field>
+          </FieldGroup>
+        </FieldSet>
+
+        <FieldSet title="Spotlight">
+          <FieldGroup>
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldLabel htmlFor="spotlight-enabled">Enabled</FieldLabel>
+              </FieldContent>
+              <Switch
+                checked={spotlight.enabled}
+                onCheckedChange={(enabled) => void updateSpotlight({ enabled })}
+                aria-label="Spotlight"
+              />
+            </Field>
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldLabel htmlFor="spotlight-radius">Radius</FieldLabel>
+              </FieldContent>
+              <Slider
+                variant="filled"
+                size="small"
+                className="w-44"
+                value={[spotlight.radius]}
+                min={80}
+                max={360}
+                step={5}
+                onValueChange={(value) => void updateSpotlight({ radius: value[0] })}
+                endContent={(value) => <span className="tabular-nums">{value}px</span>}
+                endContentClassName="min-w-14"
+                aria-label="Spotlight radius"
+              />
+            </Field>
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldLabel htmlFor="spotlight-dim-opacity">Dim amount</FieldLabel>
+              </FieldContent>
+              <Slider
+                variant="filled"
+                size="small"
+                className="w-44"
+                value={[Math.round(spotlight.dimOpacity * 100)]}
+                min={20}
+                max={90}
+                step={5}
+                onValueChange={(value) =>
+                  void updateSpotlight({ dimOpacity: (value[0] ?? 55) / 100 })
+                }
+                endContent={(value) => <span className="tabular-nums">{value}%</span>}
+                endContentClassName="min-w-14"
+                aria-label="Spotlight dim amount"
               />
             </Field>
           </FieldGroup>
