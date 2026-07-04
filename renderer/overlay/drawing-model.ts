@@ -58,6 +58,10 @@ export interface DragState {
 export interface EraseDragState {
   /** The committed set before the eraser drag, recorded when the first hit happens. */
   readonly baseShapes: readonly Shape[];
+  /** Undo stack before the eraser drag, restored if the drag is cancelled. */
+  readonly baseUndoStack: readonly (readonly Shape[])[];
+  /** Redo stack before the eraser drag, restored if the drag is cancelled. */
+  readonly baseRedoStack: readonly (readonly Shape[])[];
   /** True once this drag has erased at least one shape and recorded history. */
   readonly erased: boolean;
 }
@@ -198,7 +202,6 @@ export function addText(
   return {
     ...model,
     shapes: [...model.shapes, shape],
-    current: null,
     selectedIndex: null,
     undoStack: pushHistory(model.undoStack, model.shapes),
     redoStack: [],
@@ -538,7 +541,12 @@ export function beginErase(model: DrawingModel): DrawingModel {
     ...model,
     current: null,
     selectedIndex: null,
-    eraseDrag: { baseShapes: model.shapes, erased: false },
+    eraseDrag: {
+      baseShapes: model.shapes,
+      baseUndoStack: model.undoStack,
+      baseRedoStack: model.redoStack,
+      erased: false,
+    },
   };
 }
 
@@ -583,6 +591,20 @@ export function eraseAt(
 export function endErase(model: DrawingModel): DrawingModel {
   if (!model.eraseDrag) return model;
   return { ...model, eraseDrag: null };
+}
+
+/** Cancel the eraser drag, restoring the committed set and history from drag start. */
+export function cancelErase(model: DrawingModel): DrawingModel {
+  const eraseDrag = model.eraseDrag;
+  if (!eraseDrag) return model;
+  return {
+    ...model,
+    shapes: eraseDrag.baseShapes,
+    eraseDrag: null,
+    undoStack: eraseDrag.erased ? eraseDrag.baseUndoStack : model.undoStack,
+    redoStack: eraseDrag.erased ? eraseDrag.baseRedoStack : model.redoStack,
+    revision: model.revision + 1,
+  };
 }
 
 const ELLIPSE_HIT_SAMPLES = 64;

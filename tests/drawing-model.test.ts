@@ -5,6 +5,7 @@ import {
   beginDrag,
   canRedo,
   canUndo,
+  cancelErase,
   clearAll,
   commitShape,
   constrainPoint,
@@ -342,6 +343,42 @@ describe("eraser transitions", () => {
     expect(model.revision).toBe(beforeErase.revision);
   });
 
+  it("cancelErase restores shapes and removes the drag undo entry", () => {
+    let model = drawStroke(createModel(), verticalStroke(0));
+    model = drawStroke(model, verticalStroke(12));
+    const beforeErase = model;
+
+    model = beginErase(model);
+    model = eraseAt(model, { x: 0, y: 10 });
+    model = eraseAt(model, { x: 12, y: 10 });
+    expect(model.shapes).toEqual([]);
+    expect(model.undoStack).toHaveLength(beforeErase.undoStack.length + 1);
+
+    model = cancelErase(model);
+
+    expect(model.eraseDrag).toBeNull();
+    expect(model.shapes).toEqual(beforeErase.shapes);
+    expect(model.undoStack).toEqual(beforeErase.undoStack);
+    expect(model.redoStack).toEqual(beforeErase.redoStack);
+    expect(model.revision).toBeGreaterThan(beforeErase.revision);
+    expect(model).not.toBe(beforeErase);
+  });
+
+  it("cancelErase without hits leaves history untouched", () => {
+    let model = drawStroke(createModel(), verticalStroke(0));
+    const beforeErase = model;
+
+    model = beginErase(model);
+    model = eraseAt(model, { x: 100, y: 100 });
+    model = cancelErase(model);
+
+    expect(model.eraseDrag).toBeNull();
+    expect(model.shapes).toEqual(beforeErase.shapes);
+    expect(model.undoStack).toBe(beforeErase.undoStack);
+    expect(model.redoStack).toBe(beforeErase.redoStack);
+    expect(model.revision).toBeGreaterThan(beforeErase.revision);
+  });
+
   it("clears redo when an erase actually removes a shape", () => {
     let model = drawStroke(createModel(), verticalStroke(0));
     model = drawStroke(model, verticalStroke(12));
@@ -373,6 +410,19 @@ describe("text shapes", () => {
 
     model = undo(model);
     expect(model.shapes).toEqual([]);
+  });
+
+  it("preserves the current in-progress shape when text is added", () => {
+    let model = startShape(createModel(), PEN, { x: 0, y: 0 });
+    model = updateShape(model, { x: 10, y: 10 }, false);
+    const current = model.current;
+
+    model = addText(model, { color: "#0A84FF", size: 4, text: "Hello" }, { x: 5, y: 6 });
+
+    expect(model.current).toBe(current);
+    expect(model.shapes).toEqual([
+      { tool: "text", color: "#0A84FF", size: 4, text: "Hello", points: [{ x: 5, y: 6 }] },
+    ]);
   });
 
   it("uses injected measurement for text bounds and hits", () => {
