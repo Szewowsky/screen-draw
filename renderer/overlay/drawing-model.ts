@@ -131,6 +131,23 @@ export function startShape(
 }
 
 /** Extend the in-progress shape to `point`, honoring the Shift constraint. */
+export function extendFreehandPoints(
+  points: readonly Point[],
+  point: Point,
+  shift: boolean,
+): readonly Point[] | null {
+  const start = points[0];
+  if (!start) return [point];
+  if (shift) {
+    // Shift collapses the freehand stroke to a straight origin → cursor line.
+    return [start, point];
+  }
+  // Thin sub-`MIN_POINT_DISTANCE` moves. The first point is always kept.
+  const last = points[points.length - 1];
+  if (Math.hypot(point.x - last.x, point.y - last.y) < MIN_POINT_DISTANCE) return null;
+  return [...points, point];
+}
+
 export function updateShape(model: DrawingModel, point: Point, shift: boolean): DrawingModel {
   const current = model.current;
   if (!current) return model;
@@ -138,16 +155,11 @@ export function updateShape(model: DrawingModel, point: Point, shift: boolean): 
   const start = current.points[0];
   let points: readonly Point[];
   if (current.tool === "pen" || current.tool === "highlighter") {
-    if (shift) {
-      // Shift collapses the freehand stroke to a straight origin → cursor line.
-      points = [start, point];
-    } else {
-      // Thin sub-`MIN_POINT_DISTANCE` moves: return the same model reference so
-      // the caller skips the repaint entirely. The first point is always kept.
-      const last = current.points[current.points.length - 1];
-      if (Math.hypot(point.x - last.x, point.y - last.y) < MIN_POINT_DISTANCE) return model;
-      points = [...current.points, point];
-    }
+    const nextPoints = extendFreehandPoints(current.points, point, shift);
+    // Null means a sub-`MIN_POINT_DISTANCE` move was skipped; return the same
+    // model reference so the caller skips the repaint entirely.
+    if (nextPoints === null) return model;
+    points = nextPoints;
   } else {
     points = [start, constrainPoint(current.tool, start, point, shift)];
   }

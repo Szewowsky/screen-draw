@@ -16,6 +16,7 @@ import {
   endDrag,
   endErase,
   eraseAt,
+  extendFreehandPoints,
   getBounds,
   hitsShape,
   MIN_POINT_DISTANCE,
@@ -94,6 +95,35 @@ describe("point collection", () => {
 });
 
 describe("point thinning", () => {
+  it("extendFreehandPoints appends a kept freehand point", () => {
+    const points = [{ x: 0, y: 0 }];
+    const next = extendFreehandPoints(points, { x: MIN_POINT_DISTANCE, y: 0 }, false);
+
+    expect(next).toEqual([
+      { x: 0, y: 0 },
+      { x: MIN_POINT_DISTANCE, y: 0 },
+    ]);
+    expect(next).not.toBe(points);
+  });
+
+  it("extendFreehandPoints returns null for a sub-threshold point", () => {
+    const points = [{ x: 0, y: 0 }];
+
+    expect(extendFreehandPoints(points, { x: MIN_POINT_DISTANCE / 2, y: 0 }, false)).toBeNull();
+  });
+
+  it("extendFreehandPoints collapses Shift freehand to origin and cursor", () => {
+    const points = [
+      { x: 0, y: 0 },
+      { x: 10, y: 10 },
+    ];
+
+    expect(extendFreehandPoints(points, { x: 20, y: 5 }, true)).toEqual([
+      { x: 0, y: 0 },
+      { x: 20, y: 5 },
+    ]);
+  });
+
   it("appends a freehand point that is at least MIN_POINT_DISTANCE away", () => {
     let model = startShape(createModel(), PEN, { x: 0, y: 0 });
     model = updateShape(model, { x: MIN_POINT_DISTANCE, y: 0 }, false);

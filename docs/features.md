@@ -27,7 +27,7 @@ Screen Draw is in one of three states:
 | Select & move | `V` | Click selects the topmost shape (generous hit area incl. arrowheads); drag moves it; `⌫`/`Delete` removes it. Click empty canvas to deselect. While selected, the toolbar mirrors the shape's color/size — a color swatch (or `1`–`6`), the popover, or the size slider (or `[`/`]`) restyles the selection instead of the new-stroke defaults (undoable; deselect restores your defaults). |
 | Pen | `P` | Smoothed freehand. Hold `⇧` for a straight line. |
 | Highlighter | `H` | Smoothed wide translucent band. Hold `⇧` for a straight line. |
-| Laser pointer | `F` | Temporary freehand pointer ink using the current color and brush size. A released stroke holds briefly, fades out, and never enters undo/redo, selection, clear-all, or session-ink wipes. |
+| Laser pointer | `F` | Temporary freehand pointer ink using the current color and brush size, with a glow that stays visually consistent on Retina and non-Retina displays. A released stroke holds briefly, fades out, and never enters undo/redo, selection, clear-all, or session-ink wipes. |
 | Eraser | `E` | Drag across committed shapes to remove every touched stroke or shape. One eraser drag is one undo step. |
 | Text | `X` | Click to place a single-line text caret. `Enter` commits and `Esc` cancels. Non-empty text also commits when you click another text point, switch tools, pin the annotations, fully exit drawing, or blur the input; an empty caret cancels. While the caret is open, `⌘Z`/`⌘⇧Z` edit the text instead of undoing the canvas. Committed text is selectable, movable, restylable, deletable, and undoable like other shapes. |
 | Line | `L` | Hold `⇧` to snap to 45° angles. |

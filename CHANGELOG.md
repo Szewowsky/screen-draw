@@ -8,6 +8,7 @@ All notable changes to Screen Draw are documented here. Feature descriptions liv
 - **Text input lifecycle.** Non-empty text now commits when you click another text point, switch tools, pin annotations, or blur the input; empty inputs cancel. While the caret is open, `⌘Z`/`⌘⇧Z` stay with text editing instead of undoing or redoing canvas shapes.
 - **Exit cleanup.** Leaving drawing now resolves text, finishes laser strokes, and cancels in-progress moves/erases before any session-ink wipe, so unfinished interactions cannot revive or stick after exit. Pointer cancellation and lost capture now clean up the active drawing interaction too.
 - **Escape while erasing.** Pressing `Esc` during an eraser drag now restores the shapes from before that drag instead of exiting with the partial erase applied.
+- **Laser pointer hygiene.** Laser glow now has the same visual size across display pixel ratios, released strokes hold without a free-running repaint loop, and frozen strokes reuse cached path commands while fading.
 
 ## 1.7.0 — 2026-07-03
 

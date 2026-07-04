@@ -26,10 +26,10 @@ import {
   endDrag,
   endErase,
   eraseAt,
+  extendFreehandPoints,
   getBounds,
   HIT_TOLERANCE,
   hitTest,
-  MIN_POINT_DISTANCE,
   redo as modelRedo,
   restyleSelected,
   selectShape,
@@ -43,8 +43,8 @@ import {
   type Point,
   type Shape,
 } from "./drawing-model";
-import { ephemeralAlpha, pruneExpiredEphemerals } from "./ephemeral-ink";
-import { freehandPathCommands } from "./smooth-path";
+import { EPHEMERAL_HOLD_MS, ephemeralAlpha, pruneExpiredEphemerals } from "./ephemeral-ink";
+import { freehandPathCommands, type FreehandPathCommand } from "./smooth-path";
 
 interface OverlayWindowState {
   active?: boolean;
@@ -102,9 +102,16 @@ const OVERLAY_TOOLS = new Set<OverlayTool>([
 /** Padding between a selected shape's bounds and the dashed indicator box. */
 const SELECTION_PADDING = 4;
 
+interface LaserShape extends Shape {
+  tool: "pen";
+  points: Point[];
+}
+
 interface LaserStroke {
-  shape: Shape;
+  shape: LaserShape;
   endedAt: number | null;
+  cachedCommands: readonly FreehandPathCommand[] | null;
+  fadeTimer: number | null;
 }
 
 const ERASER_CURSOR_RADIUS = HIT_TOLERANCE;
@@ -211,11 +218,29 @@ function drawArrowHead(ctx: CanvasRenderingContext2D, from: Point, to: Point, si
   ctx.stroke();
 }
 
+function strokeFreehandPath(ctx: CanvasRenderingContext2D, commands: readonly FreehandPathCommand[]) {
+  ctx.beginPath();
+  for (const command of commands) {
+    if (command.type === "moveTo") {
+      ctx.moveTo(command.point.x, command.point.y);
+    } else if (command.type === "lineTo") {
+      ctx.lineTo(command.point.x, command.point.y);
+    } else {
+      ctx.quadraticCurveTo(command.control.x, command.control.y, command.end.x, command.end.y);
+    }
+  }
+  ctx.stroke();
+}
+
 /** Paint `shape` onto `ctx` at the tool's own opacity (0.35 for the highlighter). */
 function drawShape(
   ctx: CanvasRenderingContext2D,
   shape: Shape,
-  options: { alpha?: number; glow?: boolean } = {},
+  options: {
+    alpha?: number;
+    cachedCommands?: readonly FreehandPathCommand[] | null;
+    glow?: boolean;
+  } = {},
 ) {
   const { points: pts } = shape;
   if (pts.length === 0) return;
@@ -226,7 +251,7 @@ function drawShape(
   ctx.strokeStyle = shape.color;
   ctx.fillStyle = shape.color;
   if (options.glow) {
-    ctx.shadowBlur = shape.size * 2;
+    ctx.shadowBlur = shape.size * 2 * (window.devicePixelRatio || 1);
     ctx.shadowColor = shape.color;
   }
 
@@ -240,17 +265,7 @@ function drawShape(
   }
 
   if (shape.tool === "pen" || shape.tool === "highlighter") {
-    ctx.beginPath();
-    for (const command of freehandPathCommands(pts)) {
-      if (command.type === "moveTo") {
-        ctx.moveTo(command.point.x, command.point.y);
-      } else if (command.type === "lineTo") {
-        ctx.lineTo(command.point.x, command.point.y);
-      } else {
-        ctx.quadraticCurveTo(command.control.x, command.control.y, command.end.x, command.end.y);
-      }
-    }
-    ctx.stroke();
+    strokeFreehandPath(ctx, options.cachedCommands ?? freehandPathCommands(pts));
   } else if (shape.tool === "text") {
     const text = shape.text ?? "";
     if (text.length > 0) {
@@ -294,7 +309,6 @@ export function OverlayView() {
   const drawingRef = useRef(false);
   const laserStrokesRef = useRef<LaserStroke[]>([]);
   const activeLaserStrokeRef = useRef<LaserStroke | null>(null);
-  const laserLoopActiveRef = useRef(false);
   const textInputStateRef = useRef<TextInputState | null>(null);
   const textInputOpenRef = useRef(false);
   const resolvedTextInputsRef = useRef<WeakSet<TextInputState>>(new WeakSet());
@@ -371,15 +385,16 @@ export function OverlayView() {
     return measured;
   }, []);
 
-  const redraw = useCallback(() => {
+  const redraw = useCallback((): boolean => {
     const ctx = ctxRef.current;
     const canvas = canvasRef.current;
-    if (!ctx || !canvas) return;
+    if (!ctx || !canvas) return false;
     const model = modelRef.current;
     const now = performance.now();
     if (laserStrokesRef.current.length > 0) {
       laserStrokesRef.current = pruneExpiredEphemerals(laserStrokesRef.current, now);
     }
+    let hasFadingLaserStroke = false;
 
     let layer = committedLayerRef.current;
     const stale =
@@ -392,7 +407,7 @@ export function OverlayView() {
       off.width = canvas.width;
       off.height = canvas.height;
       const offCtx = off.getContext("2d");
-      if (!offCtx) return;
+      if (!offCtx) return false;
       // Same device-pixel dimensions and DPR transform as the main canvas, so
       // the blit below is pixel-identical to painting the shapes directly.
       offCtx.clearRect(0, 0, off.width, off.height);
@@ -404,7 +419,7 @@ export function OverlayView() {
       layer = { canvas: off, revision: model.revision };
       committedLayerRef.current = layer;
     }
-    if (!layer) return;
+    if (!layer) return false;
 
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -419,7 +434,20 @@ export function OverlayView() {
     ctx.restore();
     for (const stroke of laserStrokesRef.current) {
       const alpha = ephemeralAlpha(stroke, now);
-      if (alpha > 0) drawShape(ctx, stroke.shape, { alpha, glow: true });
+      if (alpha > 0) {
+        drawShape(ctx, stroke.shape, {
+          alpha,
+          cachedCommands: stroke.cachedCommands,
+          glow: true,
+        });
+      }
+      if (
+        stroke.endedAt !== null &&
+        now - stroke.endedAt > EPHEMERAL_HOLD_MS &&
+        alpha > 0
+      ) {
+        hasFadingLaserStroke = true;
+      }
     }
     if (model.current) {
       drawShape(ctx, model.current);
@@ -436,6 +464,7 @@ export function OverlayView() {
       if (model.drag) drawShape(ctx, selected);
       drawSelectionIndicator(ctx, selected, measureTextForCanvas);
     }
+    return hasFadingLaserStroke;
   }, [measureTextForCanvas]);
 
   // Coalesce several triggers in one frame (pointer drag + broadcast + toolbar
@@ -447,19 +476,9 @@ export function OverlayView() {
     if (rafRef.current !== null) return;
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = null;
-      redraw();
-      if (laserLoopActiveRef.current) {
-        if (laserStrokesRef.current.length > 0) scheduleRedraw();
-        else laserLoopActiveRef.current = false;
-      }
+      if (redraw()) scheduleRedraw();
     });
   }, [redraw]);
-
-  const startLaserLoop = useCallback(() => {
-    if (laserStrokesRef.current.length === 0) return;
-    laserLoopActiveRef.current = true;
-    scheduleRedraw();
-  }, [scheduleRedraw]);
 
   // Cancel a pending frame on unmount so the rAF callback never touches a
   // detached canvas. Own effect (not the canvas effect's cleanup, which fires on
@@ -467,7 +486,9 @@ export function OverlayView() {
   useEffect(() => {
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      laserLoopActiveRef.current = false;
+      for (const stroke of laserStrokesRef.current) {
+        if (stroke.fadeTimer !== null) window.clearTimeout(stroke.fadeTimer);
+      }
     };
   }, []);
 
@@ -616,13 +637,15 @@ export function OverlayView() {
           points: [point],
         },
         endedAt: null,
+        cachedCommands: null,
+        fadeTimer: null,
       };
       activeLaserStrokeRef.current = stroke;
-      laserStrokesRef.current = [...laserStrokesRef.current, stroke];
+      laserStrokesRef.current.push(stroke);
       drawingRef.current = true;
-      startLaserLoop();
+      scheduleRedraw();
     },
-    [startLaserLoop],
+    [scheduleRedraw],
   );
 
   const updateLaserStroke = useCallback(
@@ -630,28 +653,35 @@ export function OverlayView() {
       const stroke = activeLaserStrokeRef.current;
       if (!stroke) return;
       const points = stroke.shape.points;
-      const start = points[0];
       if (shift) {
-        stroke.shape = { ...stroke.shape, points: [start, point] };
+        const nextPoints = extendFreehandPoints(points, point, true);
+        if (nextPoints === null) return;
+        stroke.shape = { ...stroke.shape, points: [...nextPoints] };
       } else {
         const last = points[points.length - 1];
-        if (Math.hypot(point.x - last.x, point.y - last.y) < MIN_POINT_DISTANCE) return;
-        stroke.shape = { ...stroke.shape, points: [...points, point] };
+        if (!last || extendFreehandPoints([last], point, false) === null) return;
+        points.push(point);
       }
-      startLaserLoop();
+      stroke.cachedCommands = null;
+      scheduleRedraw();
     },
-    [startLaserLoop],
+    [scheduleRedraw],
   );
 
   const finishLaserStroke = useCallback(() => {
     const stroke = activeLaserStrokeRef.current;
     if (!stroke) return false;
     stroke.endedAt = performance.now();
+    stroke.cachedCommands = freehandPathCommands(stroke.shape.points);
+    stroke.fadeTimer = window.setTimeout(() => {
+      stroke.fadeTimer = null;
+      scheduleRedraw();
+    }, EPHEMERAL_HOLD_MS);
     activeLaserStrokeRef.current = null;
     drawingRef.current = false;
-    startLaserLoop();
+    scheduleRedraw();
     return true;
-  }, [startLaserLoop]);
+  }, [scheduleRedraw]);
 
   const requestVanishingToggle = useCallback(() => {
     void window.screenDraw.ipc.invoke("overlay:toggleVanishing");

@@ -19,8 +19,22 @@ export function isEphemeralExpired(ink: EphemeralInk, now: number): boolean {
 }
 
 export function pruneExpiredEphemerals<T extends EphemeralInk>(
-  ephemerals: readonly T[],
+  ephemerals: T[],
   now: number,
 ): T[] {
-  return ephemerals.filter((ink) => !isEphemeralExpired(ink, now));
+  let firstExpired = -1;
+  for (let i = 0; i < ephemerals.length; i++) {
+    if (isEphemeralExpired(ephemerals[i], now)) {
+      firstExpired = i;
+      break;
+    }
+  }
+  if (firstExpired === -1) return ephemerals;
+
+  const next = ephemerals.slice(0, firstExpired);
+  for (let i = firstExpired + 1; i < ephemerals.length; i++) {
+    const ink = ephemerals[i];
+    if (!isEphemeralExpired(ink, now)) next.push(ink);
+  }
+  return next;
 }

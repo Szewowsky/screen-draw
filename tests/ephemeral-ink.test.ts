@@ -42,4 +42,12 @@ describe("ephemeral ink timing", () => {
       holding,
     ]);
   });
+
+  it("returns the same array when no strokes expire", () => {
+    const fresh = { endedAt: null, id: "fresh" };
+    const holding = { endedAt: 1000 + EPHEMERAL_HOLD_MS, id: "holding" };
+    const strokes = [fresh, holding];
+
+    expect(pruneExpiredEphemerals(strokes, 1000 + EPHEMERAL_HOLD_MS + 1)).toBe(strokes);
+  });
 });
