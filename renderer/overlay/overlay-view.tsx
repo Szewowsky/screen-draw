@@ -15,6 +15,7 @@ import {
   canRedo as modelCanRedo,
   canUndo as modelCanUndo,
   cancelDrag,
+  cancelErase,
   clearAll as modelClearAll,
   commitShape,
   createModel,
@@ -740,23 +741,23 @@ export function OverlayView() {
   // overlay (a selection can live on a non-active display). Committed shapes stay.
   const cancelInteraction = useCallback(() => {
     finishLaserStroke();
-    cancelTextInput();
     drawingRef.current = false;
-    applyModel(selectShape(endErase(cancelDrag(discardCurrent(modelRef.current))), null));
-  }, [applyModel, cancelTextInput, finishLaserStroke]);
+    applyModel(selectShape(cancelErase(cancelDrag(discardCurrent(modelRef.current))), null));
+  }, [applyModel, finishLaserStroke]);
 
   useEffect(() => {
     textInputElementRef.current?.focus();
   }, [textInput]);
 
-  // Follow the tri-state broadcast. On a FULL exit (hidden: !active && !sticky)
-  // with session ink ON, this overlay resets its model to a clean slate — canvas
-  // and undo history wiped for the next session (session ink OFF persists as
-  // always). PINNING (sticky) never wipes; it only cancels any selection /
-  // in-progress stroke before the overlay goes click-through. `activeRef` gates
-  // the keydown handler so pinned overlays ignore keys even while they briefly
-  // still hold focus. (The toolbar's session-hidden reset now lives in main,
-  // which re-shows the toolbar window on re-activation.)
+  // Follow the tri-state broadcast. Every exit (sticky or hidden) first resolves
+  // text and cancels any active interaction. On a FULL exit (hidden: !active &&
+  // !sticky) with session ink ON, this overlay then resets its model to a clean
+  // slate — canvas and undo history wiped for the next session (session ink OFF
+  // persists as always). PINNING (sticky) never wipes; it only leaves the overlay
+  // click-through. `activeRef` gates the keydown handler so pinned overlays
+  // ignore keys even while they briefly still hold focus. (The toolbar's
+  // session-hidden reset now lives in main, which re-shows the toolbar window on
+  // re-activation.)
   //
   // The listener is intentionally NOT gated on isThisActiveDisplay, so EVERY
   // display's overlay reacts. Each overlay decides the wipe from its OWN
@@ -770,10 +771,9 @@ export function OverlayView() {
       markLatencyActivation(p, displayIdRef.current);
       activeRef.current = p.active === true;
       if (p.active) return;
-      if (p.sticky) {
-        resolveTextInput();
-        cancelInteraction();
-      } else if (vanishingRef.current) applyModel(createModel());
+      resolveTextInput();
+      cancelInteraction();
+      if (!p.sticky && vanishingRef.current) applyModel(createModel());
       if (!p.sticky) setBoardModeState("transparent");
     });
     return () => unsub?.();
@@ -1020,7 +1020,7 @@ export function OverlayView() {
       if (e.buttons === 0) selectThisDisplay();
       const model = modelRef.current;
       if (activeLaserStrokeRef.current) {
-        updateLaserStroke(toPoint(e), e.shiftKey);
+        if (e.buttons !== 0) updateLaserStroke(toPoint(e), e.shiftKey);
         return;
       }
       if (model.drag) {
@@ -1050,6 +1050,24 @@ export function OverlayView() {
       if (!drawingRef.current) return;
       drawingRef.current = false;
       applyModel(commitShape(model));
+    };
+
+    const onPointerCancel = () => {
+      if (finishLaserStroke()) return;
+      const model = modelRef.current;
+      if (model.current) {
+        drawingRef.current = false;
+        applyModel(discardCurrent(model));
+        return;
+      }
+      if (model.drag) {
+        applyModel(cancelDrag(model));
+        return;
+      }
+      if (model.eraseDrag) {
+        drawingRef.current = false;
+        applyModel(cancelErase(model));
+      }
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1184,6 +1202,8 @@ export function OverlayView() {
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerup", onPointerUp);
+    canvas.addEventListener("pointercancel", onPointerCancel);
+    canvas.addEventListener("lostpointercapture", onPointerCancel);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("resize", setupCanvas);
 
@@ -1191,6 +1211,8 @@ export function OverlayView() {
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerup", onPointerUp);
+      canvas.removeEventListener("pointercancel", onPointerCancel);
+      canvas.removeEventListener("lostpointercapture", onPointerCancel);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("resize", setupCanvas);
     };
