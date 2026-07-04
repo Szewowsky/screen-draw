@@ -85,6 +85,37 @@ export function Button({
   );
 }
 
+export function Switch({
+  checked,
+  onCheckedChange,
+  "aria-label": ariaLabel,
+}: {
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  "aria-label"?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={ariaLabel}
+      onClick={() => onCheckedChange(!checked)}
+      className={clsx(
+        "no-drag relative h-7 w-12 rounded-full border border-white/10 transition",
+        checked ? "bg-orange-500" : "bg-[#2a2a2a]",
+      )}
+    >
+      <span
+        className={clsx(
+          "absolute top-1 size-5 rounded-full bg-white shadow-sm transition",
+          checked ? "left-6" : "left-1",
+        )}
+      />
+    </button>
+  );
+}
+
 export function ColorWell({
   value,
   onChange,

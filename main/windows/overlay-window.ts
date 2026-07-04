@@ -58,6 +58,7 @@ let effectsActive = false;
 let activeDisplayId: number | null = null;
 let displayListenersRegistered = false;
 let deferredOverlayFocusTimer: ReturnType<typeof setTimeout> | null = null;
+let effectsCursorTimer: ReturnType<typeof setInterval> | null = null;
 let textInputOpen = false;
 
 // Undo/redo use ⌘Z / ⌘⇧Z, which macOS's Edit menu claims as key equivalents and
@@ -132,6 +133,61 @@ function withDisplayId(url: string, displayId: number): string {
 
 function broadcastActiveDisplay(): void {
   broadcast("overlay:active-display-changed", { activeDisplayId });
+}
+
+function settingsEffectsActive(): boolean {
+  const settings = getSettings();
+  return settings.cursorHighlight.enabled || settings.spotlight.enabled;
+}
+
+function publishEffectsCursor(): void {
+  const point = screen.getCursorScreenPoint();
+  const display = screen.getDisplayNearestPoint(point);
+  const win = overlayWindows.get(display.id);
+  if (!win || win.isDestroyed()) return;
+  win.webContents.send("effects:cursor", {
+    displayId: display.id,
+    x: point.x - display.bounds.x,
+    y: point.y - display.bounds.y,
+  });
+}
+
+function startEffectsCursorFeed(): void {
+  if (effectsCursorTimer !== null) return;
+  publishEffectsCursor();
+  effectsCursorTimer = setInterval(publishEffectsCursor, 16);
+}
+
+function stopEffectsCursorFeed(): void {
+  if (effectsCursorTimer === null) return;
+  clearInterval(effectsCursorTimer);
+  effectsCursorTimer = null;
+}
+
+function hideOverlayWindows(): void {
+  for (const win of overlayWindows.values()) {
+    if (!win.isDestroyed()) win.hide();
+  }
+}
+
+export async function syncOverlayEffectsFromSettings(): Promise<void> {
+  const nextEffectsActive = settingsEffectsActive();
+  if (effectsActive === nextEffectsActive) {
+    if (effectsActive) startEffectsCursorFeed();
+    else stopEffectsCursorFeed();
+    return;
+  }
+
+  effectsActive = nextEffectsActive;
+  if (effectsActive) startEffectsCursorFeed();
+  else stopEffectsCursorFeed();
+
+  if (!effectsActive && mode === "hidden") {
+    hideOverlayWindows();
+    return;
+  }
+
+  await syncOverlayWindows();
 }
 
 function adoptSharedToolbarStateForDisplay(
@@ -479,9 +535,7 @@ function enterHidden(): void {
   unregisterDrawingShortcuts();
   hideToolbarWindow();
   if (effectsActive) return;
-  for (const win of overlayWindows.values()) {
-    if (!win.isDestroyed()) win.hide();
-  }
+  hideOverlayWindows();
 }
 
 /** Apply a target mode: run the matching side effects and broadcast the change. */

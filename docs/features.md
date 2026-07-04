@@ -86,10 +86,14 @@ Hover any toolbar control to see its name and shortcut where a shortcut exists.
 
 **Hidden in recordings**: with the setting on (the toolbar's recordings button, Settings window, or `⇧R`), the toolbar window gets macOS content protection — you see it on the physical screen, but screen recorders (QuickTime, OBS) and screen sharing don't capture it. Your drawings are always captured. The toolbar carries a recordings button that lights up while the setting is on, so you can tell at a glance whether the bar is being captured; it, `⇧R`, and the Settings window all stay in sync.
 
+## Presenter effects
+
+The control panel's **Presenter effects** section and the tray menu include switches for cursor highlight and spotlight. These settings persist with the rest of Screen Draw's preferences and drive the effect overlay state independently from drawing mode.
+
 ## App presence
 
-Screen Draw is a menu-bar app: no Dock icon. The tray (menu bar) icon offers Show Control Panel, Toggle Drawing, Settings…, and Quit.
+Screen Draw is a menu-bar app: no Dock icon. The tray (menu bar) icon offers Show Control Panel, Toggle Drawing, Cursor Highlight, Spotlight, Settings…, and Quit.
 
 ## Settings & persistence
 
-Stored in `~/Library/Application Support/Screen Draw/screen-draw-settings.json`: activation shortcut, default color/size, toolbar position scope, shared/per-display toolbar positions, recent colors, and the recordings-hide flag. Shared toolbar tool settings and session ink are session state carried between displays while drawing. Old settings files from previous versions load cleanly.
+Stored in `~/Library/Application Support/Screen Draw/screen-draw-settings.json`: activation shortcut, default color/size, toolbar position scope, shared/per-display toolbar positions, recent colors, the recordings-hide flag, and presenter effect settings. Shared toolbar tool settings and session ink are session state carried between displays while drawing. Old settings files from previous versions load cleanly.

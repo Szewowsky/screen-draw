@@ -16,6 +16,9 @@ import {
   addRecentColor,
   coerceSettings,
   type ScreenDrawSettings,
+  type CursorHighlightSettings,
+  type EffectsShortcuts,
+  type SpotlightSettings,
   type ToolbarPosition,
   type ToolbarPositionByDisplay,
   type ToolbarPositionScope,
@@ -23,6 +26,9 @@ import {
 
 export type {
   ScreenDrawSettings,
+  CursorHighlightSettings,
+  EffectsShortcuts,
+  SpotlightSettings,
   ToolbarPosition,
   ToolbarPositionByDisplay,
   ToolbarPositionScope,
@@ -88,6 +94,11 @@ export function setDefaults(partial: {
   hideToolbarInRecordings?: boolean;
   /** Flip hideToolbarInRecordings atomically (read-modify-write happens here, not in the caller). */
   toggleHideToolbarInRecordings?: boolean;
+  cursorHighlight?: Partial<CursorHighlightSettings>;
+  toggleCursorHighlight?: boolean;
+  spotlight?: Partial<SpotlightSettings>;
+  toggleSpotlight?: boolean;
+  effectsShortcuts?: Partial<EffectsShortcuts>;
 }): ScreenDrawSettings {
   const current = getSettings();
   const nextHideInRecordings = partial.toggleHideToolbarInRecordings
@@ -123,6 +134,24 @@ export function setDefaults(partial: {
         ? addRecentColor(current.recentColors, partial.recentColor)
         : current.recentColors,
       hideToolbarInRecordings: nextHideInRecordings,
+      cursorHighlight: {
+        ...current.cursorHighlight,
+        ...partial.cursorHighlight,
+        enabled: partial.toggleCursorHighlight
+          ? !current.cursorHighlight.enabled
+          : (partial.cursorHighlight?.enabled ?? current.cursorHighlight.enabled),
+      },
+      spotlight: {
+        ...current.spotlight,
+        ...partial.spotlight,
+        enabled: partial.toggleSpotlight
+          ? !current.spotlight.enabled
+          : (partial.spotlight?.enabled ?? current.spotlight.enabled),
+      },
+      effectsShortcuts: {
+        ...current.effectsShortcuts,
+        ...partial.effectsShortcuts,
+      },
     }),
   );
   return getSettings();

@@ -12,10 +12,18 @@ import {
   getSettings,
   setDefaults,
   setShortcut,
+  type CursorHighlightSettings,
+  type EffectsShortcuts,
   type ScreenDrawSettings,
+  type SpotlightSettings,
 } from "../services/settings-store.js";
 import { broadcast } from "../services/events.js";
-import { getShortcutStatus, registerToggleShortcut } from "../services/shortcut.js";
+import {
+  getEffectsShortcutStatus,
+  getShortcutStatus,
+  registerEffectsShortcuts,
+  registerToggleShortcut,
+} from "../services/shortcut.js";
 import {
   getActiveDisplayId,
   isOverlayActive,
@@ -24,6 +32,7 @@ import {
   setOverlayActiveDisplay,
   setOverlaySticky,
   setOverlayTextInputOpen,
+  syncOverlayEffectsFromSettings,
   toggleOverlayVanishing,
 } from "../windows/overlay-window.js";
 import { applyContentProtection } from "../windows/toolbar-window.js";
@@ -34,6 +43,42 @@ function overlayState() {
     active: isOverlayActive(),
     sticky: isOverlaySticky(),
     activeDisplayId: getActiveDisplayId(),
+  };
+}
+
+function objectValue(raw: unknown): Record<string, unknown> | null {
+  return typeof raw === "object" && raw !== null && !Array.isArray(raw)
+    ? (raw as Record<string, unknown>)
+    : null;
+}
+
+function cursorHighlightInput(raw: unknown): Partial<CursorHighlightSettings> | undefined {
+  const value = objectValue(raw);
+  if (!value) return undefined;
+  return {
+    ...(typeof value.enabled === "boolean" ? { enabled: value.enabled } : {}),
+    ...(typeof value.color === "string" ? { color: value.color } : {}),
+    ...(typeof value.size === "number" ? { size: value.size } : {}),
+    ...(typeof value.opacity === "number" ? { opacity: value.opacity } : {}),
+  };
+}
+
+function spotlightInput(raw: unknown): Partial<SpotlightSettings> | undefined {
+  const value = objectValue(raw);
+  if (!value) return undefined;
+  return {
+    ...(typeof value.enabled === "boolean" ? { enabled: value.enabled } : {}),
+    ...(typeof value.radius === "number" ? { radius: value.radius } : {}),
+    ...(typeof value.dimOpacity === "number" ? { dimOpacity: value.dimOpacity } : {}),
+  };
+}
+
+function effectsShortcutsInput(raw: unknown): Partial<EffectsShortcuts> | undefined {
+  const value = objectValue(raw);
+  if (!value) return undefined;
+  return {
+    ...(typeof value.highlight === "string" ? { highlight: value.highlight } : {}),
+    ...(typeof value.spotlight === "string" ? { spotlight: value.spotlight } : {}),
   };
 }
 
@@ -100,6 +145,10 @@ export function registerOverlayHandlers(): void {
     return getShortcutStatus();
   });
 
+  ipcMain.handle("effects-shortcuts:getStatus", async () => {
+    return getEffectsShortcutStatus();
+  });
+
   ipcMain.handle(
     "settings:setDefaults",
     async (_event, partial: unknown): Promise<ScreenDrawSettings> => {
@@ -111,6 +160,11 @@ export function registerOverlayHandlers(): void {
         recentColor?: unknown;
         hideToolbarInRecordings?: unknown;
         toggleHideToolbarInRecordings?: unknown;
+        cursorHighlight?: unknown;
+        toggleCursorHighlight?: unknown;
+        spotlight?: unknown;
+        toggleSpotlight?: unknown;
+        effectsShortcuts?: unknown;
       };
       const position = input.toolbarPosition as { x?: unknown; y?: unknown } | null | undefined;
       const toolbarPosition =
@@ -134,10 +188,19 @@ export function registerOverlayHandlers(): void {
             ? input.hideToolbarInRecordings
             : undefined,
         toggleHideToolbarInRecordings: input.toggleHideToolbarInRecordings === true,
+        cursorHighlight: cursorHighlightInput(input.cursorHighlight),
+        toggleCursorHighlight: input.toggleCursorHighlight === true,
+        spotlight: spotlightInput(input.spotlight),
+        toggleSpotlight: input.toggleSpotlight === true,
+        effectsShortcuts: effectsShortcutsInput(input.effectsShortcuts),
       });
       // Re-apply content protection to the toolbar window whenever the setting
       // may have changed (no-op if it did not).
       applyContentProtection();
+      await syncOverlayEffectsFromSettings();
+      if (input.effectsShortcuts !== undefined) {
+        await registerEffectsShortcuts(next.effectsShortcuts);
+      }
       broadcast("settings:changed", next);
       return next;
     },

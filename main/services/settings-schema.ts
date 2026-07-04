@@ -14,6 +14,24 @@ export interface ToolbarPosition {
 export type ToolbarPositionScope = "shared" | "per-display";
 export type ToolbarPositionByDisplay = Record<string, ToolbarPosition>;
 
+export interface CursorHighlightSettings {
+  enabled: boolean;
+  color: string;
+  size: number;
+  opacity: number;
+}
+
+export interface SpotlightSettings {
+  enabled: boolean;
+  radius: number;
+  dimOpacity: number;
+}
+
+export interface EffectsShortcuts {
+  highlight?: string;
+  spotlight?: string;
+}
+
 export interface ScreenDrawSettings {
   /** Global accelerator that toggles drawing mode, e.g. "Command+Shift+D". */
   shortcut: string;
@@ -31,6 +49,12 @@ export interface ScreenDrawSettings {
   recentColors: string[];
   /** When true, the toolbar window is hidden from screen recordings (content protection). */
   hideToolbarInRecordings: boolean;
+  /** Presenter cursor highlight effect settings. */
+  cursorHighlight: CursorHighlightSettings;
+  /** Presenter spotlight effect settings. */
+  spotlight: SpotlightSettings;
+  /** Optional presenter effect global shortcuts; empty strings mean disabled. */
+  effectsShortcuts: EffectsShortcuts;
 }
 
 export const DEFAULT_SETTINGS: ScreenDrawSettings = {
@@ -42,6 +66,9 @@ export const DEFAULT_SETTINGS: ScreenDrawSettings = {
   toolbarPositionByDisplay: {},
   recentColors: [],
   hideToolbarInRecordings: false,
+  cursorHighlight: { enabled: false, color: "#FFD60A", size: 60, opacity: 0.35 },
+  spotlight: { enabled: false, radius: 180, dimOpacity: 0.55 },
+  effectsShortcuts: {},
 };
 
 /** Maximum number of remembered custom colors. */
@@ -83,6 +110,49 @@ function coerceRecentColors(raw: unknown): string[] {
   return colors;
 }
 
+function coerceUnitInterval(raw: unknown, fallback: number): number {
+  return typeof raw === "number" && Number.isFinite(raw) && raw >= 0 && raw <= 1 ? raw : fallback;
+}
+
+function coercePositiveNumber(raw: unknown, fallback: number): number {
+  return typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : fallback;
+}
+
+function coerceCursorHighlight(raw: unknown): CursorHighlightSettings {
+  const value = (raw ?? {}) as Partial<Record<keyof CursorHighlightSettings, unknown>>;
+  return {
+    enabled: value.enabled === true,
+    color:
+      typeof value.color === "string" && HEX_COLOR.test(value.color)
+        ? value.color
+        : DEFAULT_SETTINGS.cursorHighlight.color,
+    size: coercePositiveNumber(value.size, DEFAULT_SETTINGS.cursorHighlight.size),
+    opacity: coerceUnitInterval(value.opacity, DEFAULT_SETTINGS.cursorHighlight.opacity),
+  };
+}
+
+function coerceSpotlight(raw: unknown): SpotlightSettings {
+  const value = (raw ?? {}) as Partial<Record<keyof SpotlightSettings, unknown>>;
+  return {
+    enabled: value.enabled === true,
+    radius: coercePositiveNumber(value.radius, DEFAULT_SETTINGS.spotlight.radius),
+    dimOpacity: coerceUnitInterval(value.dimOpacity, DEFAULT_SETTINGS.spotlight.dimOpacity),
+  };
+}
+
+function coerceEffectsShortcuts(raw: unknown): EffectsShortcuts {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return {};
+  const value = raw as Partial<Record<keyof EffectsShortcuts, unknown>>;
+  return {
+    ...(typeof value.highlight === "string" && value.highlight.trim()
+      ? { highlight: value.highlight.trim() }
+      : {}),
+    ...(typeof value.spotlight === "string" && value.spotlight.trim()
+      ? { spotlight: value.spotlight.trim() }
+      : {}),
+  };
+}
+
 /** Turn raw (possibly legacy, partial, or corrupt) JSON into valid settings. */
 export function coerceSettings(raw: unknown): ScreenDrawSettings {
   const value = (raw ?? {}) as Partial<Record<keyof ScreenDrawSettings, unknown>>;
@@ -106,6 +176,9 @@ export function coerceSettings(raw: unknown): ScreenDrawSettings {
     toolbarPositionByDisplay: coerceToolbarPositionByDisplay(value.toolbarPositionByDisplay),
     recentColors: coerceRecentColors(value.recentColors),
     hideToolbarInRecordings: value.hideToolbarInRecordings === true,
+    cursorHighlight: coerceCursorHighlight(value.cursorHighlight),
+    spotlight: coerceSpotlight(value.spotlight),
+    effectsShortcuts: coerceEffectsShortcuts(value.effectsShortcuts),
   };
 }
 

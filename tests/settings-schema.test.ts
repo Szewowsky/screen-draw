@@ -22,6 +22,9 @@ describe("coerceSettings", () => {
       toolbarPositionByDisplay: {},
       recentColors: [],
       hideToolbarInRecordings: false,
+      cursorHighlight: DEFAULT_SETTINGS.cursorHighlight,
+      spotlight: DEFAULT_SETTINGS.spotlight,
+      effectsShortcuts: {},
     });
   });
 
@@ -68,6 +71,46 @@ describe("coerceSettings", () => {
   it("fills partial input with defaults per field", () => {
     const result = coerceSettings({ defaultSize: 12 });
     expect(result).toEqual({ ...DEFAULT_SETTINGS, defaultSize: 12 });
+  });
+
+  it("defaults presenter effects for legacy files", () => {
+    expect(coerceSettings({}).cursorHighlight).toEqual({
+      enabled: false,
+      color: "#FFD60A",
+      size: 60,
+      opacity: 0.35,
+    });
+    expect(coerceSettings({}).spotlight).toEqual({
+      enabled: false,
+      radius: 180,
+      dimOpacity: 0.55,
+    });
+    expect(coerceSettings({}).effectsShortcuts).toEqual({});
+  });
+
+  it("coerces presenter effect settings field-by-field", () => {
+    expect(
+      coerceSettings({
+        cursorHighlight: { enabled: true, color: "#abcdef", size: 72, opacity: 0.5 },
+        spotlight: { enabled: true, radius: 240, dimOpacity: 0.7 },
+        effectsShortcuts: { highlight: "Command+Option+H", spotlight: "Command+Option+S" },
+      }),
+    ).toMatchObject({
+      cursorHighlight: { enabled: true, color: "#abcdef", size: 72, opacity: 0.5 },
+      spotlight: { enabled: true, radius: 240, dimOpacity: 0.7 },
+      effectsShortcuts: { highlight: "Command+Option+H", spotlight: "Command+Option+S" },
+    });
+  });
+
+  it("rejects invalid presenter effect values individually", () => {
+    const result = coerceSettings({
+      cursorHighlight: { enabled: "yes", color: "gold", size: 0, opacity: 2 },
+      spotlight: { enabled: 1, radius: -1, dimOpacity: Number.NaN },
+      effectsShortcuts: { highlight: "   ", spotlight: null },
+    });
+    expect(result.cursorHighlight).toEqual(DEFAULT_SETTINGS.cursorHighlight);
+    expect(result.spotlight).toEqual(DEFAULT_SETTINGS.spotlight);
+    expect(result.effectsShortcuts).toEqual({});
   });
 
   it("rejects invalid field values individually", () => {

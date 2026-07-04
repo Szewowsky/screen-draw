@@ -93,6 +93,21 @@ export interface ScreenDrawSettings {
   recentColors: string[];
   /** When true, the toolbar window is hidden from screen recordings. */
   hideToolbarInRecordings: boolean;
+  cursorHighlight: {
+    enabled: boolean;
+    color: string;
+    size: number;
+    opacity: number;
+  };
+  spotlight: {
+    enabled: boolean;
+    radius: number;
+    dimOpacity: number;
+  };
+  effectsShortcuts: {
+    highlight?: string;
+    spotlight?: string;
+  };
 }
 
 export interface ShortcutStatus {

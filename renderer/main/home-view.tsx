@@ -11,6 +11,7 @@ import {
   SegmentedControlItem,
   Separator,
   Slider,
+  Switch,
   Text,
   Toolbar,
   ToolbarContent,
@@ -125,6 +126,11 @@ const SHORTCUT_ROWS: { label: string; keys: ReactNode }[] = [
   { label: "Deselect / stop drawing", keys: <Key>Esc</Key> },
 ];
 
+type EffectsShortcutStatus = {
+  highlight: ShortcutStatus;
+  spotlight: ShortcutStatus;
+};
+
 const MODIFIER_GLYPHS: Record<string, string> = {
   Command: "⌘",
   Control: "⌃",
@@ -165,6 +171,9 @@ function ShortcutKeys({ accelerator }: { accelerator: string }) {
 export function HomeView() {
   const [settings, setSettings] = useState<ScreenDrawSettings | undefined>(undefined);
   const [shortcutStatus, setShortcutStatus] = useState<ShortcutStatus | undefined>(undefined);
+  const [effectsShortcutStatus, setEffectsShortcutStatus] = useState<
+    EffectsShortcutStatus | undefined
+  >(undefined);
   const [active, setActive] = useState(false);
   const [sticky, setSticky] = useState(false);
   const [capturing, setCapturing] = useState(false);
@@ -177,6 +186,9 @@ export function HomeView() {
     void window.screenDraw.ipc
       .invoke<ShortcutStatus>("shortcut:getStatus")
       .then((next) => setShortcutStatus(next));
+    void window.screenDraw.ipc
+      .invoke<EffectsShortcutStatus>("effects-shortcuts:getStatus")
+      .then((next) => setEffectsShortcutStatus(next));
   }, []);
 
   const applyShortcut = useCallback((shortcut: string) => {
@@ -202,12 +214,21 @@ export function HomeView() {
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    const unsub = window.screenDraw.ipc.on("effects-shortcuts:status-changed", (params) => {
+      setEffectsShortcutStatus(params as EffectsShortcutStatus);
+    });
+    return () => unsub();
+  }, []);
+
   const applyDefaults = useCallback(
     (partial: {
       defaultColor?: string;
       defaultSize?: number;
       recentColor?: string;
       toolbarPositionScope?: ScreenDrawSettings["toolbarPositionScope"];
+      cursorHighlight?: Partial<ScreenDrawSettings["cursorHighlight"]>;
+      spotlight?: Partial<ScreenDrawSettings["spotlight"]>;
     }) => {
       void window.screenDraw.ipc
         .invoke<ScreenDrawSettings>("settings:setDefaults", partial)
@@ -268,6 +289,12 @@ export function HomeView() {
   const brushSize = settings?.defaultSize ?? 4;
   const recentColors = (settings?.recentColors ?? []).filter((c) => !isPaletteColor(c));
   const toolbarPositionScope = settings?.toolbarPositionScope ?? "shared";
+  const cursorHighlightEnabled = settings?.cursorHighlight.enabled ?? false;
+  const spotlightEnabled = settings?.spotlight.enabled ?? false;
+  const failedEffectShortcut =
+    effectsShortcutStatus?.highlight.failedAccelerator ??
+    effectsShortcutStatus?.spotlight.failedAccelerator ??
+    null;
 
   return (
     <ScrollArea
@@ -417,6 +444,35 @@ export function HomeView() {
               </SegmentedControlItem>
             </SegmentedControl>
           </Field>
+        </FieldSet>
+
+        <FieldSet title="Presenter effects" description="Show cursor effects outside drawing mode.">
+          <Field label="Cursor highlight">
+            <Switch
+              checked={cursorHighlightEnabled}
+              onCheckedChange={(enabled) => applyDefaults({ cursorHighlight: { enabled } })}
+              aria-label="Cursor highlight"
+            />
+          </Field>
+          <Field label="Spotlight">
+            <Switch
+              checked={spotlightEnabled}
+              onCheckedChange={(enabled) => applyDefaults({ spotlight: { enabled } })}
+              aria-label="Spotlight"
+            />
+          </Field>
+          {failedEffectShortcut ? (
+            <div
+              role="alert"
+              className="flex items-center gap-2.5 border-t border-white/8 px-7 py-4 text-[13px] font-semibold leading-snug text-amber-400"
+            >
+              <TriangleAlert className="size-4 shrink-0" />
+              <span>
+                Couldn't register <ShortcutKeys accelerator={failedEffectShortcut} /> — another app
+                may already be using it.
+              </span>
+            </div>
+          ) : null}
         </FieldSet>
 
         <FieldSet

@@ -9,10 +9,15 @@ import { app, BrowserWindow, Menu, Tray, nativeImage } from "electron";
 import { registerHandlers } from "./handlers/index.js";
 import { getPreloadPath, getWindowUrl } from "./windows/window-paths.js";
 import { openSettingsWindow } from "./windows/settings-window.js";
-import { createOverlayWindow, toggleOverlay } from "./windows/overlay-window.js";
-import { getSettings } from "./services/settings-store.js";
-import { registerToggleShortcut } from "./services/shortcut.js";
+import {
+  createOverlayWindow,
+  syncOverlayEffectsFromSettings,
+  toggleOverlay,
+} from "./windows/overlay-window.js";
+import { getSettings, setDefaults } from "./services/settings-store.js";
+import { registerEffectsShortcuts, registerToggleShortcut } from "./services/shortcut.js";
 import { startLatencyTriggerWatcher } from "./services/latency-probe.js";
+import { broadcast } from "./services/events.js";
 import { logger } from "./logger.js";
 
 // Get directory paths
@@ -159,13 +164,31 @@ async function setupApplicationMenu() {
 }
 
 // ── Menu bar tray ─────────────────────────────────────────────────────
-function setupTray() {
-  const iconPath = path.join(__dirname, "..", "..", "assets", "tray-iconTemplate.png");
-  const icon = nativeImage.createFromPath(iconPath);
-  icon.setTemplateImage(true);
-  tray = new Tray(icon);
-  tray.setToolTip("Screen Draw");
+async function updatePresenterEffects(partial: {
+  toggleCursorHighlight?: boolean;
+  toggleSpotlight?: boolean;
+}) {
+  const next = setDefaults(partial);
+  await syncOverlayEffectsFromSettings();
+  broadcast("settings:changed", next);
+  setupTray();
+}
 
+function setupTray() {
+  if (!tray) {
+    const iconPath = path.join(__dirname, "..", "..", "assets", "tray-iconTemplate.png");
+    const icon = nativeImage.createFromPath(iconPath);
+    icon.setTemplateImage(true);
+    tray = new Tray(icon);
+    tray.setToolTip("Screen Draw");
+    tray.on("click", () => {
+      showMainWindow().catch((error) =>
+        logger.error("main", "Failed to show main window from tray", error),
+      );
+    });
+  }
+
+  const settings = getSettings();
   const trayMenu = Menu.buildFromTemplate([
     {
       label: "Show Control Panel",
@@ -180,6 +203,26 @@ function setupTray() {
       click: () => {
         toggleOverlay({ triggerSource: "tray" }).catch((error) =>
           logger.error("main", "Failed to toggle overlay from tray", error),
+        );
+      },
+    },
+    {
+      label: "Cursor Highlight",
+      type: "checkbox",
+      checked: settings.cursorHighlight.enabled,
+      click: () => {
+        updatePresenterEffects({ toggleCursorHighlight: true }).catch((error) =>
+          logger.error("main", "Failed to toggle cursor highlight from tray", error),
+        );
+      },
+    },
+    {
+      label: "Spotlight",
+      type: "checkbox",
+      checked: settings.spotlight.enabled,
+      click: () => {
+        updatePresenterEffects({ toggleSpotlight: true }).catch((error) =>
+          logger.error("main", "Failed to toggle spotlight from tray", error),
         );
       },
     },
@@ -199,12 +242,6 @@ function setupTray() {
     },
   ]);
   tray.setContextMenu(trayMenu);
-
-  tray.on("click", () => {
-    showMainWindow().catch((error) =>
-      logger.error("main", "Failed to show main window from tray", error),
-    );
-  });
 
   logger.info("main", "Menu bar tray configured");
 }
@@ -270,11 +307,16 @@ app.whenReady().then(async () => {
   setupTray();
 
   // Create the drawing overlay (hidden) and register the activation shortcut.
-  createOverlayWindow().catch((error) => {
-    logger.error("main", "Failed to create overlay window", error);
-  });
+  createOverlayWindow()
+    .then(() => syncOverlayEffectsFromSettings())
+    .catch((error) => {
+      logger.error("main", "Failed to create overlay window", error);
+    });
   registerToggleShortcut(getSettings().shortcut).catch((error) => {
     logger.error("main", "Failed to register toggle shortcut", error);
+  });
+  registerEffectsShortcuts(getSettings().effectsShortcuts).catch((error) => {
+    logger.error("main", "Failed to register effect shortcuts", error);
   });
 
   createMainWindow()
