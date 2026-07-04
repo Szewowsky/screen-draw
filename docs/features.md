@@ -67,8 +67,9 @@ Board mode is per display and resets to transparent on a full exit. Pinning whil
 One `Esc` does the most local thing first:
 1. Closes the color popover (if open).
 2. Cancels an in-progress move — the shape snaps back.
-3. Deselects the selected shape.
-4. Exits drawing mode.
+3. Cancels an in-progress eraser drag — erased shapes snap back.
+4. Deselects the selected shape.
+5. Exits drawing mode.
 
 ## The floating toolbar
 

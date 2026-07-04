@@ -1094,6 +1094,11 @@ export function OverlayView() {
           applyModel(selectShape(cancelDrag(model), null));
           return;
         }
+        if (model.eraseDrag) {
+          drawingRef.current = false;
+          applyModel(cancelErase(model));
+          return;
+        }
         if (model.selectedIndex !== null) {
           applyModel(selectShape(model, null));
           return;
