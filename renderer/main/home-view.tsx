@@ -22,22 +22,31 @@ import {
   MAX_SIZE,
   MIN_SIZE,
   PALETTE,
+  TOOL_REGISTRY,
   isPaletteColor,
+  type OverlayTool,
   type ScreenDrawSettings,
   type ShortcutStatus,
 } from "../overlay/constants";
 
+const TOOL_SHORTCUT_LABELS = {
+  select: "Select & move",
+  pen: "Pen",
+  highlighter: "Highlighter",
+  laser: "Laser pointer",
+  eraser: "Eraser",
+  text: "Text",
+  line: "Line",
+  arrow: "Arrow",
+  rectangle: "Rectangle",
+  ellipse: "Ellipse",
+} satisfies Record<OverlayTool, string>;
+
 const SHORTCUT_ROWS: { label: string; keys: ReactNode }[] = [
-  { label: "Select & move", keys: <Key>V</Key> },
-  { label: "Pen", keys: <Key>P</Key> },
-  { label: "Highlighter", keys: <Key>H</Key> },
-  { label: "Laser pointer", keys: <Key>F</Key> },
-  { label: "Eraser", keys: <Key>E</Key> },
-  { label: "Text", keys: <Key>X</Key> },
-  { label: "Line", keys: <Key>L</Key> },
-  { label: "Arrow", keys: <Key>A</Key> },
-  { label: "Rectangle", keys: <Key>R</Key> },
-  { label: "Ellipse", keys: <Key>O</Key> },
+  ...TOOL_REGISTRY.map(({ tool, key }) => ({
+    label: TOOL_SHORTCUT_LABELS[tool],
+    keys: <Key>{key}</Key>,
+  })),
   {
     label: "Pick color",
     keys: (

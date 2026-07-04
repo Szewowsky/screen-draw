@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { pickAdoptableToolbarState } from "../main/services/toolbar-state-cache";
+import { ADOPTABLE_TOOLS } from "../renderer/overlay/constants";
 
 describe("pickAdoptableToolbarState", () => {
   it("picks tool, color, size, and vanishing from a full toolbar state", () => {
@@ -26,8 +27,8 @@ describe("pickAdoptableToolbarState", () => {
     ).toEqual({ tool: "select", color: "#FF3B30", size: 4 });
   });
 
-  it("accepts presenter tools added in 1.7 without adopting board mode", () => {
-    for (const tool of ["laser", "eraser", "text"] as const) {
+  it("accepts every registry-adoptable tool without adopting board mode", () => {
+    for (const tool of ADOPTABLE_TOOLS) {
       expect(
         pickAdoptableToolbarState({
           tool,

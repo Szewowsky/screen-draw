@@ -59,24 +59,46 @@ import {
   MAX_SIZE,
   MIN_SIZE,
   PALETTE,
+  TOOL_REGISTRY,
   isPaletteColor,
   type BoardMode,
   type OverlayTool,
 } from "./constants";
 import { normalizeHexColor } from "./color";
 
-export const TOOLS: { tool: OverlayTool; label: string; key: string; Icon: typeof Pencil }[] = [
-  { tool: "select", label: "Select", key: "V", Icon: MousePointer2 },
-  { tool: "pen", label: "Pen", key: "P", Icon: Pencil },
-  { tool: "highlighter", label: "Highlighter", key: "H", Icon: Highlighter },
-  { tool: "laser", label: "Laser pointer", key: "F", Icon: Zap },
-  { tool: "eraser", label: "Eraser", key: "E", Icon: Eraser },
-  { tool: "text", label: "Text", key: "X", Icon: Type },
-  { tool: "line", label: "Line", key: "L", Icon: Minus },
-  { tool: "arrow", label: "Arrow", key: "A", Icon: ArrowUpRight },
-  { tool: "rectangle", label: "Rectangle", key: "R", Icon: Square },
-  { tool: "ellipse", label: "Ellipse", key: "O", Icon: Circle },
-];
+const TOOL_LABELS = {
+  select: "Select",
+  pen: "Pen",
+  highlighter: "Highlighter",
+  laser: "Laser pointer",
+  eraser: "Eraser",
+  text: "Text",
+  line: "Line",
+  arrow: "Arrow",
+  rectangle: "Rectangle",
+  ellipse: "Ellipse",
+} satisfies Record<OverlayTool, string>;
+
+const TOOL_ICONS = {
+  select: MousePointer2,
+  pen: Pencil,
+  highlighter: Highlighter,
+  laser: Zap,
+  eraser: Eraser,
+  text: Type,
+  line: Minus,
+  arrow: ArrowUpRight,
+  rectangle: Square,
+  ellipse: Circle,
+} satisfies Record<OverlayTool, typeof Pencil>;
+
+export const TOOLS: { tool: OverlayTool; label: string; key: string; Icon: typeof Pencil }[] =
+  TOOL_REGISTRY.map(({ tool, key }) => ({
+    tool,
+    key,
+    label: TOOL_LABELS[tool],
+    Icon: TOOL_ICONS[tool],
+  }));
 
 interface FloatingToolbarProps {
   tool: OverlayTool;

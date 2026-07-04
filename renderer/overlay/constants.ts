@@ -40,10 +40,34 @@ export const COLOR_PRESETS: string[] = [
 export const MIN_SIZE = 1;
 export const MAX_SIZE = 24;
 
-export type DrawTool = "pen" | "highlighter" | "line" | "arrow" | "rectangle" | "ellipse" | "text";
+export const TOOL_REGISTRY = [
+  { tool: "select", key: "V", adoptable: true },
+  { tool: "pen", key: "P", adoptable: true },
+  { tool: "highlighter", key: "H", adoptable: true },
+  { tool: "laser", key: "F", adoptable: true },
+  { tool: "eraser", key: "E", adoptable: true },
+  { tool: "text", key: "X", adoptable: true },
+  { tool: "line", key: "L", adoptable: true },
+  { tool: "arrow", key: "A", adoptable: true },
+  { tool: "rectangle", key: "R", adoptable: true },
+  { tool: "ellipse", key: "O", adoptable: true },
+] as const;
 
-/** Tools available in the overlay toolbar: drawing tools plus the select tool. */
-export type OverlayTool = DrawTool | "select" | "laser" | "eraser";
+export type OverlayTool = (typeof TOOL_REGISTRY)[number]["tool"];
+export type DrawTool = Exclude<OverlayTool, "select" | "laser" | "eraser">;
+export type AdoptableTool = Extract<(typeof TOOL_REGISTRY)[number], { adoptable: true }>["tool"];
+
+export const TOOL_KEYS: Record<string, OverlayTool> = Object.fromEntries(
+  TOOL_REGISTRY.map((entry) => [entry.key.toLowerCase(), entry.tool]),
+) as Record<string, OverlayTool>;
+
+export const OVERLAY_TOOLS: ReadonlySet<OverlayTool> = new Set(
+  TOOL_REGISTRY.map((entry) => entry.tool),
+);
+
+export const ADOPTABLE_TOOLS: ReadonlySet<AdoptableTool> = new Set(
+  TOOL_REGISTRY.filter((entry) => entry.adoptable).map((entry) => entry.tool),
+);
 
 export type BoardMode = "transparent" | "white" | "black";
 

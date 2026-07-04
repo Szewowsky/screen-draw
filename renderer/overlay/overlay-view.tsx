@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   MAX_SIZE,
   MIN_SIZE,
+  OVERLAY_TOOLS,
   PALETTE,
+  TOOL_KEYS,
   isPaletteColor,
   type BoardMode,
   type OverlayTool,
@@ -19,6 +21,7 @@ import {
   clearAll as modelClearAll,
   commitShape,
   createModel,
+  DEFAULT_TEXT_MEASURE,
   beginErase,
   deleteSelected,
   discardCurrent,
@@ -66,38 +69,6 @@ interface SetVanishingPayload {
   activeDisplayId?: unknown;
   vanishing?: unknown;
 }
-
-/**
- * Single-key → tool map for the overlay's keydown handler. Kept local (rather
- * than importing the toolbar's TOOLS list) so the overlay bundle stays free of
- * the toolbar component and its icon imports — the toolbar now lives in its own
- * window.
- */
-const TOOL_KEYS: Record<string, OverlayTool> = {
-  v: "select",
-  p: "pen",
-  h: "highlighter",
-  f: "laser",
-  e: "eraser",
-  x: "text",
-  l: "line",
-  a: "arrow",
-  r: "rectangle",
-  o: "ellipse",
-};
-
-const OVERLAY_TOOLS = new Set<OverlayTool>([
-  "select",
-  "pen",
-  "highlighter",
-  "laser",
-  "eraser",
-  "text",
-  "line",
-  "arrow",
-  "rectangle",
-  "ellipse",
-]);
 
 /** Padding between a selected shape's bounds and the dashed indicator box. */
 const SELECTION_PADDING = 4;
@@ -309,10 +280,9 @@ export function OverlayView() {
   const drawingRef = useRef(false);
   const laserStrokesRef = useRef<LaserStroke[]>([]);
   const activeLaserStrokeRef = useRef<LaserStroke | null>(null);
-  const textInputStateRef = useRef<TextInputState | null>(null);
+  const textInputRef = useRef<TextInputState | null>(null);
   const textInputOpenRef = useRef(false);
   const resolvedTextInputsRef = useRef<WeakSet<TextInputState>>(new WeakSet());
-  const textInputElementRef = useRef<HTMLInputElement>(null);
   const textMeasureCacheRef = useRef<Map<string, { width: number; height: number }>>(new Map());
   const boardModeRef = useRef<BoardMode>("transparent");
   // Whether this overlay is in interactive drawing mode. In sticky the windows
@@ -325,6 +295,8 @@ export function OverlayView() {
   const [color, setColor] = useState(PALETTE[0].value);
   const [size, setSize] = useState(4);
   const [textInput, setTextInput] = useState<TextInputState | null>(null);
+  textInputRef.current = textInput;
+  const textInputIsOpen = textInput !== null;
   const [boardMode, setBoardMode] = useState<BoardMode>("transparent");
   const [recentColors, setRecentColors] = useState<string[]>([]);
   // Style (color/size) of the currently selected shape, or null when nothing is
@@ -376,7 +348,7 @@ export function OverlayView() {
     const cached = textMeasureCacheRef.current.get(key);
     if (cached) return cached;
     const ctx = ctxRef.current;
-    if (!ctx) return { width: text.length * fontPx * 0.6, height: fontPx };
+    if (!ctx) return DEFAULT_TEXT_MEASURE(text, fontPx);
     ctx.save();
     ctx.font = textFont(fontPx);
     const measured = { width: ctx.measureText(text).width, height: fontPx };
@@ -503,6 +475,7 @@ export function OverlayView() {
   /** Store the next model state, repaint, and sync the toolbar's enabled states. */
   const applyModel = useCallback(
     (next: DrawingModel) => {
+      if (next === modelRef.current) return;
       modelRef.current = next;
       scheduleRedraw();
       // Mirror the selected shape's style to the toolbar (null when deselected).
@@ -548,14 +521,9 @@ export function OverlayView() {
     void window.screenDraw.ipc.invoke("overlay:textInputOpen", open);
   }, []);
 
-  const setTextInputState = useCallback(
-    (next: TextInputState | null) => {
-      textInputStateRef.current = next;
-      setTextInput(next);
-      setTextInputOpen(next !== null);
-    },
-    [setTextInputOpen],
-  );
+  useEffect(() => {
+    setTextInputOpen(textInputIsOpen);
+  }, [setTextInputOpen, textInputIsOpen]);
 
   const setBoardModeState = useCallback(
     (next: BoardMode) => {
@@ -567,19 +535,19 @@ export function OverlayView() {
   );
 
   const cancelTextInput = useCallback(
-    (state: TextInputState | null = textInputStateRef.current) => {
+    (state: TextInputState | null = textInputRef.current) => {
       if (!state || resolvedTextInputsRef.current.has(state)) return;
       resolvedTextInputsRef.current.add(state);
-      if (textInputStateRef.current === state) setTextInputState(null);
+      if (textInputRef.current === state) setTextInput(null);
     },
-    [setTextInputState],
+    [],
   );
 
   const commitTextInput = useCallback(
     (state: TextInputState) => {
       if (resolvedTextInputsRef.current.has(state)) return;
       resolvedTextInputsRef.current.add(state);
-      if (textInputStateRef.current === state) setTextInputState(null);
+      if (textInputRef.current === state) setTextInput(null);
       if (state.value.length === 0) return;
       applyModel(
         addText(
@@ -589,10 +557,10 @@ export function OverlayView() {
         ),
       );
     },
-    [applyModel, setTextInputState],
+    [applyModel],
   );
 
-  const resolveTextInput = useCallback((state: TextInputState | null = textInputStateRef.current) => {
+  const resolveTextInput = useCallback((state: TextInputState | null = textInputRef.current) => {
     const current = state;
     if (!current) return;
     if (current.value.length === 0) cancelTextInput(current);
@@ -774,10 +742,6 @@ export function OverlayView() {
     drawingRef.current = false;
     applyModel(selectShape(cancelErase(cancelDrag(discardCurrent(modelRef.current))), null));
   }, [applyModel, finishLaserStroke]);
-
-  useEffect(() => {
-    textInputElementRef.current?.focus();
-  }, [textInput]);
 
   // Follow the tri-state broadcast. Every exit (sticky or hidden) first resolves
   // text and cancels any active interaction. On a FULL exit (hidden: !active &&
@@ -1021,7 +985,7 @@ export function OverlayView() {
         drawingRef.current = false;
         resolveTextInput();
         applyModel(selectShape(modelRef.current, null));
-        setTextInputState({
+        setTextInput({
           anchor: p,
           color: colorRef.current,
           size: sizeRef.current,
@@ -1264,7 +1228,7 @@ export function OverlayView() {
     startLaserStroke,
     updateLaserStroke,
     finishLaserStroke,
-    setTextInputState,
+    setTextInput,
     resolveTextInput,
     measureTextForCanvas,
     cycleBoardMode,
@@ -1282,14 +1246,14 @@ export function OverlayView() {
       />
       {textInput ? (
         <input
-          ref={textInputElementRef}
           type="text"
+          autoFocus
           value={textInput.value}
           spellCheck={false}
           autoComplete="off"
           aria-label="Annotation text"
           onChange={(e) => {
-            setTextInputState({ ...textInput, value: e.currentTarget.value });
+            setTextInput({ ...textInput, value: e.currentTarget.value });
           }}
           onBlur={() => resolveTextInput(textInput)}
           onKeyDown={(e) => {

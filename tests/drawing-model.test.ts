@@ -459,9 +459,16 @@ describe("text shapes", () => {
     const model = addText(createModel(), { color: "#FF3B30", size: 4, text: "Hello" }, { x: 5, y: 6 });
     const shape = model.shapes[0];
 
-    expect(getBounds(shape, measureText)).toEqual({ minX: 5, minY: 6, maxX: 47, maxY: 24 });
-    expect(hitsShape(shape, { x: 46, y: 23 }, measureText)).toBe(true);
-    expect(hitsShape(shape, { x: 48, y: 23 }, measureText)).toBe(false);
+    expect(getBounds(shape, measureText)).toEqual({ minX: 1, minY: 2, maxX: 51, maxY: 28 });
+    expect(hitsShape(shape, { x: 50, y: 23 }, measureText)).toBe(true);
+    expect(hitsShape(shape, { x: 52, y: 23 }, measureText)).toBe(false);
+  });
+
+  it("hits text inside HIT_TOLERANCE outside the measured glyph box", () => {
+    const model = addText(createModel(), { color: "#FF3B30", size: 4, text: "Hello" }, { x: 5, y: 6 });
+    const shape = model.shapes[0];
+
+    expect(hitsShape(shape, { x: 50, y: 15 }, measureText)).toBe(true);
   });
 
   it("moves, restyles, deletes, and restores text through existing transitions", () => {

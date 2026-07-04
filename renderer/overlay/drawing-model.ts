@@ -203,7 +203,7 @@ export function addText(
   options: { color: string; size: number; text: string },
   point: Point,
 ): DrawingModel {
-  if (model.drag || model.eraseDrag || options.text.length === 0) return model;
+  if (interacting(model) || options.text.length === 0) return model;
   const shape: Shape = {
     tool: "text",
     color: options.color,
@@ -223,7 +223,7 @@ export function addText(
 
 export function undo(model: DrawingModel): DrawingModel {
   const snapshot = model.undoStack[model.undoStack.length - 1];
-  if (!snapshot || model.drag || model.eraseDrag) return model;
+  if (!snapshot || interacting(model)) return model;
   return {
     ...model,
     shapes: snapshot,
@@ -236,7 +236,7 @@ export function undo(model: DrawingModel): DrawingModel {
 
 export function redo(model: DrawingModel): DrawingModel {
   const snapshot = model.redoStack[model.redoStack.length - 1];
-  if (!snapshot || model.drag || model.eraseDrag) return model;
+  if (!snapshot || interacting(model)) return model;
   return {
     ...model,
     shapes: snapshot,
@@ -263,7 +263,7 @@ export function clearAll(model: DrawingModel): DrawingModel {
 
 /** Select the shape at `index` (or deselect with null). No-op while dragging. */
 export function selectShape(model: DrawingModel, index: number | null): DrawingModel {
-  if (model.drag || model.eraseDrag) return model;
+  if (interacting(model)) return model;
   const valid = index !== null && index >= 0 && index < model.shapes.length ? index : null;
   if (valid === model.selectedIndex) return model;
   return { ...model, selectedIndex: valid };
@@ -275,7 +275,7 @@ export function selectShape(model: DrawingModel, index: number | null): DrawingM
  * while the drag is in progress.
  */
 export function beginDrag(model: DrawingModel, point: Point): DrawingModel {
-  if (model.drag || model.eraseDrag || model.selectedIndex === null) return model;
+  if (interacting(model) || model.selectedIndex === null) return model;
   const index = model.selectedIndex;
   const base = model.shapes[index];
   return {
@@ -341,7 +341,7 @@ export function cancelDrag(model: DrawingModel): DrawingModel {
 
 /** Delete the selected shape. Undoable like any other operation. */
 export function deleteSelected(model: DrawingModel): DrawingModel {
-  if (model.drag || model.eraseDrag || model.selectedIndex === null) return model;
+  if (interacting(model) || model.selectedIndex === null) return model;
   return {
     ...model,
     shapes: model.shapes.filter((_, i) => i !== model.selectedIndex),
@@ -405,7 +405,7 @@ export function restyleSelected(
   style: ShapeStyle,
   options: { coalesce?: boolean } = {},
 ): DrawingModel {
-  if (model.drag || model.eraseDrag || model.selectedIndex === null) return model;
+  if (interacting(model) || model.selectedIndex === null) return model;
   const index = model.selectedIndex;
   const shape = model.shapes[index];
   const color = style.color ?? shape.color;
@@ -487,10 +487,14 @@ export function textFontPx(size: number): number {
   return 8 + size * 3;
 }
 
-const DEFAULT_TEXT_MEASURE: MeasureText = (text, fontPx) => ({
+export const DEFAULT_TEXT_MEASURE: MeasureText = (text, fontPx) => ({
   width: text.length * fontPx * 0.6,
   height: fontPx,
 });
+
+export function interacting(model: DrawingModel): boolean {
+  return model.drag !== null || model.eraseDrag !== null;
+}
 
 /** Axis-aligned bounding box of a shape's painted extent (stroke width included). */
 export function getBounds(
@@ -505,10 +509,10 @@ export function getBounds(
     const anchor = pts[0];
     const measured = measureText(text, textFontPx(shape.size));
     return {
-      minX: anchor.x,
-      minY: anchor.y,
-      maxX: anchor.x + measured.width,
-      maxY: anchor.y + measured.height,
+      minX: anchor.x - HIT_TOLERANCE,
+      minY: anchor.y - HIT_TOLERANCE,
+      maxX: anchor.x + measured.width + HIT_TOLERANCE,
+      maxY: anchor.y + measured.height + HIT_TOLERANCE,
     };
   }
   let minX = Infinity;
@@ -548,7 +552,7 @@ function withinPolyline(point: Point, pts: readonly Point[], radius: number): bo
 
 /** Begin a stroke-level eraser drag. The undo snapshot is recorded only on first hit. */
 export function beginErase(model: DrawingModel): DrawingModel {
-  if (model.drag || model.eraseDrag) return model;
+  if (interacting(model)) return model;
   return {
     ...model,
     current: null,
