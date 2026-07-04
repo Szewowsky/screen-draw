@@ -132,6 +132,11 @@ type EffectsShortcutStatus = {
   spotlight: ShortcutStatus;
 };
 
+type OpenAtLoginState = {
+  openAtLogin: boolean;
+  available: boolean;
+};
+
 const MODIFIER_GLYPHS: Record<string, string> = {
   Command: "⌘",
   Control: "⌃",
@@ -178,6 +183,13 @@ export function HomeView() {
   const [active, setActive] = useState(false);
   const [sticky, setSticky] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [openAtLoginState, setOpenAtLoginState] = useState<OpenAtLoginState | undefined>(undefined);
+
+  const refreshOpenAtLogin = useCallback(() => {
+    void window.screenDraw.ipc
+      .invoke<OpenAtLoginState>("app:getOpenAtLogin")
+      .then((next) => setOpenAtLoginState(next));
+  }, []);
 
   // Initial settings + shortcut status fetches.
   useEffect(() => {
@@ -191,6 +203,15 @@ export function HomeView() {
       .invoke<EffectsShortcutStatus>("effects-shortcuts:getStatus")
       .then((next) => setEffectsShortcutStatus(next));
   }, []);
+
+  useEffect(() => {
+    refreshOpenAtLogin();
+  }, [refreshOpenAtLogin]);
+
+  useEffect(() => {
+    window.addEventListener("focus", refreshOpenAtLogin);
+    return () => window.removeEventListener("focus", refreshOpenAtLogin);
+  }, [refreshOpenAtLogin]);
 
   const applyShortcut = useCallback((shortcut: string) => {
     window.screenDraw.ipc
@@ -236,6 +257,21 @@ export function HomeView() {
         .then((next) => setSettings(next));
     },
     [],
+  );
+
+  const applyOpenAtLogin = useCallback(
+    (openAtLogin: boolean) => {
+      if (openAtLoginState?.available !== true) return;
+
+      void window.screenDraw.ipc
+        .invoke<OpenAtLoginState>("app:setOpenAtLogin", openAtLogin)
+        .then((next) => setOpenAtLoginState(next))
+        .catch((error) => {
+          toast.error(`Couldn't update launch at login: ${error}`);
+          refreshOpenAtLogin();
+        });
+    },
+    [openAtLoginState?.available, refreshOpenAtLogin],
   );
 
   // Follow settings changes made elsewhere (e.g. colors picked in the overlay toolbar).
@@ -292,6 +328,8 @@ export function HomeView() {
   const toolbarPositionScope = settings?.toolbarPositionScope ?? "shared";
   const cursorHighlightEnabled = settings?.cursorHighlight.enabled ?? false;
   const spotlightEnabled = settings?.spotlight.enabled ?? false;
+  const openAtLogin = openAtLoginState?.openAtLogin ?? false;
+  const openAtLoginAvailable = openAtLoginState?.available === true;
   const failedEffectShortcut =
     effectsShortcutStatus?.highlight.failedAccelerator ??
     effectsShortcutStatus?.spotlight.failedAccelerator ??
@@ -328,6 +366,24 @@ export function HomeView() {
         </div>
 
         <Separator />
+
+        <FieldSet title="General">
+          <Field label="Launch at login">
+            <div className="flex min-w-0 items-center gap-3">
+              <Switch
+                checked={openAtLogin}
+                disabled={!openAtLoginAvailable}
+                onCheckedChange={applyOpenAtLogin}
+                aria-label="Launch at login"
+              />
+              {!openAtLoginAvailable ? (
+                <Text variant="small" color="tertiary">
+                  Available in the installed app
+                </Text>
+              ) : null}
+            </div>
+          </Field>
+        </FieldSet>
 
         <FieldSet title="Shortcut" description="Toggle drawing mode from any app.">
           <Field label="Activation shortcut">

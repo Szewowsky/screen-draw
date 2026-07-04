@@ -14,11 +14,28 @@ import { getSettingsWindow, openSettingsWindow } from "../windows/settings-windo
 import { exportAnnotatedScreenshot } from "../services/annotated-export.js";
 import { registerLatencyProbeHandlers } from "../services/latency-probe.js";
 
-import { ipcMain, nativeTheme } from "electron";
+import { app, ipcMain, nativeTheme } from "electron";
 import { logger } from "../logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+type OpenAtLoginState = {
+  openAtLogin: boolean;
+  available: boolean;
+};
+
+function getOpenAtLoginState(): OpenAtLoginState {
+  if (!app.isPackaged) {
+    logger.info("app", "Launch at login unavailable: !app.isPackaged");
+    return { openAtLogin: false, available: false };
+  }
+
+  return {
+    openAtLogin: app.getLoginItemSettings().openAtLogin,
+    available: true,
+  };
+}
 
 export function registerHandlers(): void {
   logger.info("handlers", "Registering IPC handlers...");
@@ -30,6 +47,24 @@ export function registerHandlers(): void {
 
   ipcMain.handle("app:getProjectPath", async () => {
     return path.join(__dirname, "..", "..");
+  });
+
+  ipcMain.handle("app:getOpenAtLogin", async () => {
+    return getOpenAtLoginState();
+  });
+
+  ipcMain.handle("app:setOpenAtLogin", async (_event, openAtLogin: unknown) => {
+    if (typeof openAtLogin !== "boolean") {
+      throw new Error("app:setOpenAtLogin expects a boolean");
+    }
+
+    if (!app.isPackaged) {
+      logger.info("app", "Launch at login setter ignored: !app.isPackaged");
+      return getOpenAtLoginState();
+    }
+
+    app.setLoginItemSettings({ openAtLogin });
+    return getOpenAtLoginState();
   });
 
   // Settings window handlers

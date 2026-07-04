@@ -103,6 +103,10 @@ Spotlight dims the display outside a feathered circle around the pointer. It can
 
 Screen Draw is a menu-bar app: no Dock icon. The tray (menu bar) icon offers Show Control Panel, Toggle Drawing, Cursor Highlight, Spotlight, Settings…, and Quit.
 
+The control panel's **General** section includes **Launch at login** for the installed macOS app. Turning it on adds Screen Draw to **System Settings → General → Login Items**; turning it off there is reflected in the control panel the next time the panel regains focus. Development builds show the switch disabled with **Available in the installed app** so local Electron runs are never registered as login items.
+
 ## Settings & persistence
 
 Stored in `~/Library/Application Support/Screen Draw/screen-draw-settings.json`: activation shortcut, default color/size, toolbar position scope, shared/per-display toolbar positions, recent colors, the recordings-hide flag, and presenter effect settings. Shared toolbar tool settings and session ink are session state carried between displays while drawing. Old settings files from previous versions load cleanly.
+
+Launch at login is not stored in Screen Draw's settings file. macOS Login Items is the source of truth, so changes made in System Settings cannot drift from a copied preference value.

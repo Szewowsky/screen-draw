@@ -87,10 +87,12 @@ export function Button({
 
 export function Switch({
   checked,
+  disabled = false,
   onCheckedChange,
   "aria-label": ariaLabel,
 }: {
   checked: boolean;
+  disabled?: boolean;
   onCheckedChange: (checked: boolean) => void;
   "aria-label"?: string;
 }) {
@@ -100,9 +102,10 @@ export function Switch({
       role="switch"
       aria-checked={checked}
       aria-label={ariaLabel}
+      disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
       className={clsx(
-        "no-drag relative h-7 w-12 rounded-full border border-white/10 transition",
+        "no-drag relative h-7 w-12 rounded-full border border-white/10 transition disabled:cursor-not-allowed disabled:opacity-50",
         checked ? "bg-orange-500" : "bg-[#2a2a2a]",
       )}
     >

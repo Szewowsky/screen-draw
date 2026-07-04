@@ -2,6 +2,11 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
+## 1.8.1 — 2026-07-04
+
+### Added
+- **Launch at login.** The control panel now includes a Launch at login switch for the installed macOS app. The value comes directly from macOS Login Items, refreshes when the panel regains focus, and stays disabled in development builds so local Electron runs never register themselves.
+
 ## 1.8.0 — 2026-07-04
 
 ### Added
