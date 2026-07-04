@@ -26,6 +26,7 @@ import {
   showToolbarWindow,
 } from "./toolbar-window.js";
 import { nextMode, type OverlayMode } from "../services/overlay-mode.js";
+import { resolveOverlayVisibility } from "../services/overlay-visibility.js";
 import {
   beginLatencyActivation,
   latencyActivationPayload,
@@ -53,6 +54,7 @@ const overlayWindows = new Map<number, BrowserWindow>();
  * shortcuts, publishing gates) keep their old meaning.
  */
 let mode: OverlayMode = "hidden";
+let effectsActive = false;
 let activeDisplayId: number | null = null;
 let displayListenersRegistered = false;
 let deferredOverlayFocusTimer: ReturnType<typeof setTimeout> | null = null;
@@ -112,6 +114,14 @@ function getDisplayIdForActivation(options: OverlayActivationOptions = {}): numb
     return getWindowDisplay(options.sourceWindow).id;
   }
   return getCursorDisplay().id;
+}
+
+function getOverlayVisibility(displayId: number) {
+  return resolveOverlayVisibility({
+    mode,
+    effectsActive,
+    isActiveDisplay: displayId === activeDisplayId,
+  });
 }
 
 function withDisplayId(url: string, displayId: number): string {
@@ -213,16 +223,17 @@ async function syncOverlayWindows(): Promise<BrowserWindow[]> {
     // them click-through. A new display appearing mid-session must come up in the
     // right state (visible + ignoring mouse in sticky), so this mirrors the same
     // per-mode logic used when entering the mode.
-    if (mode === "drawing" || mode === "sticky") {
-      const ignoreMouse = mode === "sticky";
+    if (mode === "drawing" || mode === "sticky" || effectsActive) {
       for (const display of displays) {
         const win = overlayWindows.get(display.id);
         if (!win || win.isDestroyed()) continue;
+        const visibility = getOverlayVisibility(display.id);
+        if (!visibility.visible) continue;
         fitToDisplay(win, display);
-        win.setIgnoreMouseEvents(ignoreMouse);
+        win.setIgnoreMouseEvents(visibility.ignoreMouse);
         // In sticky the overlays never take focus (they must not steal it from the
         // app the user is now working in), so every window shows inactive.
-        if (mode === "drawing" && display.id === activeDisplayId) {
+        if (visibility.focusBehavior === "active") {
           measureWindowOperation("overlay", display.id, "show", "overlayShowMs", () => win.show());
         } else {
           measureWindowOperation(
@@ -393,9 +404,10 @@ async function enterDrawing(options: OverlayActivationOptions): Promise<void> {
     for (const [displayId, win] of overlayWindows) {
       const display = getDisplayById(displayId);
       if (!display || win.isDestroyed()) continue;
+      const visibility = getOverlayVisibility(displayId);
       fitToDisplay(win, display);
-      win.setIgnoreMouseEvents(false);
-      if (displayId === activeDisplayId) {
+      win.setIgnoreMouseEvents(visibility.ignoreMouse);
+      if (visibility.focusBehavior === "active") {
         measureWindowOperation("overlay", displayId, "show", "overlayShowMs", () => win.show());
       } else {
         measureWindowOperation("overlay", displayId, "showInactive", "overlayShowInactiveMs", () =>
@@ -445,9 +457,10 @@ function enterSticky(): void {
   for (const [displayId, win] of overlayWindows) {
     const display = getDisplayById(displayId);
     if (!display || win.isDestroyed()) continue;
+    const visibility = getOverlayVisibility(displayId);
     fitToDisplay(win, display);
     // Click-through: pointer events fall through to whatever is underneath.
-    win.setIgnoreMouseEvents(true);
+    win.setIgnoreMouseEvents(visibility.ignoreMouse);
     // Stay visible but never take focus — the user is now working in another app.
     win.showInactive();
     fitToDisplay(win, display);
@@ -465,6 +478,7 @@ function enterHidden(): void {
   textInputOpen = false;
   unregisterDrawingShortcuts();
   hideToolbarWindow();
+  if (effectsActive) return;
   for (const win of overlayWindows.values()) {
     if (!win.isDestroyed()) win.hide();
   }
