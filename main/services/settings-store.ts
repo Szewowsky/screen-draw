@@ -11,18 +11,8 @@ import * as path from "path";
 
 import { app } from "electron";
 import { logger } from "../logger.js";
-import {
-  DEFAULT_SETTINGS,
-  addRecentColor,
-  coerceSettings,
-  type ScreenDrawSettings,
-  type CursorHighlightSettings,
-  type EffectsShortcuts,
-  type SpotlightSettings,
-  type ToolbarPosition,
-  type ToolbarPositionByDisplay,
-  type ToolbarPositionScope,
-} from "./settings-schema.js";
+import { DEFAULT_SETTINGS, coerceSettings, type ScreenDrawSettings } from "./settings-schema.js";
+import { applySettingsDefaults, type SettingsDefaultsPatch } from "./settings-defaults.js";
 
 export type {
   ScreenDrawSettings,
@@ -79,92 +69,8 @@ export function setShortcut(shortcut: string): ScreenDrawSettings {
   return getSettings();
 }
 
-export function setDefaults(partial: {
-  defaultColor?: string;
-  defaultSize?: number;
-  /** null resets the toolbar to its default placement; undefined leaves it unchanged. */
-  toolbarPosition?: ToolbarPosition | null;
-  /** Active display for a toolbar position write; per-display mode updates this entry. */
-  toolbarPositionDisplayId?: number | null;
-  /** How toolbar positions are remembered across displays. */
-  toolbarPositionScope?: ToolbarPositionScope;
-  /** A custom color to record in the recent list (does not change the default color). */
-  recentColor?: string;
-  /** Toggle hiding the toolbar window from screen recordings; undefined leaves it unchanged. */
-  hideToolbarInRecordings?: boolean;
-  /** Flip hideToolbarInRecordings atomically (read-modify-write happens here, not in the caller). */
-  toggleHideToolbarInRecordings?: boolean;
-  cursorHighlight?: Partial<CursorHighlightSettings>;
-  toggleCursorHighlight?: boolean;
-  spotlight?: Partial<SpotlightSettings>;
-  toggleSpotlight?: boolean;
-  effectsShortcuts?: Partial<EffectsShortcuts>;
-}): ScreenDrawSettings {
+export function setDefaults(partial: SettingsDefaultsPatch): ScreenDrawSettings {
   const current = getSettings();
-  const nextHideInRecordings = partial.toggleHideToolbarInRecordings
-    ? !current.hideToolbarInRecordings
-    : partial.hideToolbarInRecordings !== undefined
-      ? partial.hideToolbarInRecordings
-      : current.hideToolbarInRecordings;
-  persist(
-    coerceSettings({
-      ...current,
-      defaultColor: partial.defaultColor ?? current.defaultColor,
-      defaultSize: partial.defaultSize ?? current.defaultSize,
-      toolbarPosition:
-        partial.toolbarPosition !== undefined &&
-        (current.toolbarPositionScope === "shared" ||
-          partial.toolbarPositionDisplayId === undefined ||
-          partial.toolbarPositionDisplayId === null)
-          ? partial.toolbarPosition
-          : current.toolbarPosition,
-      toolbarPositionScope: partial.toolbarPositionScope ?? current.toolbarPositionScope,
-      toolbarPositionByDisplay:
-        partial.toolbarPosition !== undefined &&
-        current.toolbarPositionScope === "per-display" &&
-        partial.toolbarPositionDisplayId !== undefined &&
-        partial.toolbarPositionDisplayId !== null
-          ? updateToolbarPositionByDisplay(
-              current.toolbarPositionByDisplay,
-              partial.toolbarPositionDisplayId,
-              partial.toolbarPosition,
-            )
-          : current.toolbarPositionByDisplay,
-      recentColors: partial.recentColor
-        ? addRecentColor(current.recentColors, partial.recentColor)
-        : current.recentColors,
-      hideToolbarInRecordings: nextHideInRecordings,
-      cursorHighlight: {
-        ...current.cursorHighlight,
-        ...partial.cursorHighlight,
-        enabled: partial.toggleCursorHighlight
-          ? !current.cursorHighlight.enabled
-          : (partial.cursorHighlight?.enabled ?? current.cursorHighlight.enabled),
-      },
-      spotlight: {
-        ...current.spotlight,
-        ...partial.spotlight,
-        enabled: partial.toggleSpotlight
-          ? !current.spotlight.enabled
-          : (partial.spotlight?.enabled ?? current.spotlight.enabled),
-      },
-      effectsShortcuts: {
-        ...current.effectsShortcuts,
-        ...partial.effectsShortcuts,
-      },
-    }),
-  );
+  persist(applySettingsDefaults(current, partial));
   return getSettings();
-}
-
-function updateToolbarPositionByDisplay(
-  current: ToolbarPositionByDisplay,
-  displayId: number,
-  position: ToolbarPosition | null,
-): ToolbarPositionByDisplay {
-  const next = { ...current };
-  const key = String(displayId);
-  if (position === null) delete next[key];
-  else next[key] = position;
-  return next;
 }

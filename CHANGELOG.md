@@ -2,6 +2,11 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
+## 1.8.3 — 2026-07-04
+
+### Added
+- **Presenter effects on the toolbar.** The floating toolbar now has cursor highlight and spotlight toggle buttons beside the session-ink and board controls. They mirror the persisted settings, stay in sync with the control panel, tray, and optional effect shortcuts, and flip atomically through the existing settings update path.
+
 ## 1.8.2 — 2026-07-04
 
 ### Fixed

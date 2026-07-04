@@ -148,6 +148,8 @@ export function ToolbarView() {
   const [vanishing, setVanishing] = useState(false);
   const [boardMode, setBoardMode] = useState<BoardMode>("transparent");
   const [hideInRecordings, setHideInRecordings] = useState(false);
+  const [cursorHighlightEnabled, setCursorHighlightEnabled] = useState(false);
+  const [spotlightEnabled, setSpotlightEnabled] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   // Display-relative desired top-left of the bar; null = default bottom-center.
@@ -329,20 +331,23 @@ export function ToolbarView() {
     return () => unsub();
   }, [applyToolbarSettings]);
 
-  // The hidden-in-recordings state lives in settings and syncs over
-  // settings:changed (the same channel the Settings window and Shift+R use), not
-  // through the overlay's toolbar:state. Seed on mount and follow broadcasts so
-  // the on-bar toggle, Shift+R, and the Settings window stay in sync; the button
-  // click only invokes the atomic flip and lets the broadcast drive this state.
+  // These toggle states live in settings and sync over settings:changed (the
+  // same channel the Settings window, tray, and optional effect shortcuts use),
+  // not through the overlay's toolbar:state. Seed on mount and follow broadcasts
+  // so the buttons only invoke atomic flips and let the broadcast drive state.
   useEffect(() => {
+    const applyToggleSettings = (raw: unknown) => {
+      const next = raw as Partial<ScreenDrawSettings>;
+      setHideInRecordings(next.hideToolbarInRecordings === true);
+      setCursorHighlightEnabled(next.cursorHighlight?.enabled === true);
+      setSpotlightEnabled(next.spotlight?.enabled === true);
+    };
     void window.screenDraw.ipc
-      .invoke<{ hideToolbarInRecordings?: boolean }>("settings:get")
-      .then((s) => setHideInRecordings(s.hideToolbarInRecordings === true))
+      .invoke<ScreenDrawSettings>("settings:get")
+      .then(applyToggleSettings)
       .catch(() => {});
     const unsub = window.screenDraw.ipc.on("settings:changed", (params) => {
-      setHideInRecordings(
-        (params as { hideToolbarInRecordings?: boolean }).hideToolbarInRecordings === true,
-      );
+      applyToggleSettings(params);
     });
     return () => unsub();
   }, []);
@@ -478,6 +483,18 @@ export function ToolbarView() {
           }}
           boardMode={boardMode}
           onBoardModeCycle={() => action({ type: "cycleBoardMode" })}
+          cursorHighlightEnabled={cursorHighlightEnabled}
+          onCursorHighlightToggle={() => {
+            void window.screenDraw.ipc.invoke("settings:setDefaults", {
+              toggleCursorHighlight: true,
+            });
+          }}
+          spotlightEnabled={spotlightEnabled}
+          onSpotlightToggle={() => {
+            void window.screenDraw.ipc.invoke("settings:setDefaults", {
+              toggleSpotlight: true,
+            });
+          }}
           onPin={() => action({ type: "pin" })}
           hideInRecordings={hideInRecordings}
           onHideInRecordingsToggle={() => {

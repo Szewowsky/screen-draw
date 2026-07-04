@@ -5,6 +5,7 @@ import {
   addRecentColor,
   coerceSettings,
 } from "../main/services/settings-schema";
+import { applySettingsDefaults } from "../main/services/settings-defaults";
 
 describe("coerceSettings", () => {
   it("returns defaults for corrupt input", () => {
@@ -167,5 +168,85 @@ describe("addRecentColor", () => {
 
   it("ignores values that are not hex colors", () => {
     expect(addRecentColor(["#111111"], "tomato")).toEqual(["#111111"]);
+  });
+});
+
+describe("applySettingsDefaults", () => {
+  it("flips the toolbar recording flag atomically from the current settings", () => {
+    expect(
+      applySettingsDefaults(
+        { ...DEFAULT_SETTINGS, hideToolbarInRecordings: false },
+        { toggleHideToolbarInRecordings: true },
+      ).hideToolbarInRecordings,
+    ).toBe(true);
+
+    expect(
+      applySettingsDefaults(
+        { ...DEFAULT_SETTINGS, hideToolbarInRecordings: true },
+        { toggleHideToolbarInRecordings: true },
+      ).hideToolbarInRecordings,
+    ).toBe(false);
+  });
+
+  it("flips presenter effect enabled flags while preserving the rest of each effect", () => {
+    const current = {
+      ...DEFAULT_SETTINGS,
+      cursorHighlight: {
+        enabled: false,
+        color: "#abcdef",
+        size: 72,
+        opacity: 0.5,
+      },
+      spotlight: {
+        enabled: true,
+        radius: 240,
+        dimOpacity: 0.7,
+      },
+    };
+
+    expect(
+      applySettingsDefaults(current, {
+        toggleCursorHighlight: true,
+        toggleSpotlight: true,
+      }),
+    ).toMatchObject({
+      cursorHighlight: {
+        enabled: true,
+        color: "#abcdef",
+        size: 72,
+        opacity: 0.5,
+      },
+      spotlight: {
+        enabled: false,
+        radius: 240,
+        dimOpacity: 0.7,
+      },
+    });
+  });
+
+  it("lets atomic presenter-effect flips win over explicit enabled values", () => {
+    const current = {
+      ...DEFAULT_SETTINGS,
+      cursorHighlight: {
+        ...DEFAULT_SETTINGS.cursorHighlight,
+        enabled: true,
+      },
+      spotlight: {
+        ...DEFAULT_SETTINGS.spotlight,
+        enabled: false,
+      },
+    };
+
+    expect(
+      applySettingsDefaults(current, {
+        cursorHighlight: { enabled: true },
+        toggleCursorHighlight: true,
+        spotlight: { enabled: false },
+        toggleSpotlight: true,
+      }),
+    ).toMatchObject({
+      cursorHighlight: { enabled: false },
+      spotlight: { enabled: true },
+    });
   });
 });

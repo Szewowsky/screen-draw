@@ -41,6 +41,7 @@ import {
   Ghost,
   GripVertical,
   Highlighter,
+  Spotlight,
   Minus,
   MousePointer2,
   PanelTop,
@@ -49,6 +50,7 @@ import {
   Pin,
   Redo2,
   Square,
+  Target,
   Type,
   Undo2,
   VideoOff,
@@ -116,6 +118,14 @@ interface FloatingToolbarProps {
   onVanishingToggle: () => void;
   boardMode: BoardMode;
   onBoardModeCycle: () => void;
+  /** Whether the cursor highlight presenter effect is enabled. */
+  cursorHighlightEnabled: boolean;
+  /** Toggle cursor highlight through the settings store's atomic flip. */
+  onCursorHighlightToggle: () => void;
+  /** Whether the spotlight presenter effect is enabled. */
+  spotlightEnabled: boolean;
+  /** Toggle spotlight through the settings store's atomic flip. */
+  onSpotlightToggle: () => void;
   /** Pin the annotations: leave them on screen but click-through (sticky mode). */
   onPin: () => void;
   /** Whether the toolbar window is hidden from screen recordings (content protection). */
@@ -160,6 +170,10 @@ export function FloatingToolbar({
   onVanishingToggle,
   boardMode,
   onBoardModeCycle,
+  cursorHighlightEnabled,
+  onCursorHighlightToggle,
+  spotlightEnabled,
+  onSpotlightToggle,
   onPin,
   hideInRecordings,
   onHideInRecordingsToggle,
@@ -388,8 +402,6 @@ export function FloatingToolbar({
         </TooltipContent>
       </Tooltip>
 
-      <Separator orientation="vertical" />
-
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
@@ -409,6 +421,46 @@ export function FloatingToolbar({
         <TooltipContent side={tooltipSide} shortcut={["G"]}>
           Session ink
         </TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="transparent"
+            size="small"
+            iconOnly
+            className={
+              "!size-6" +
+              (cursorHighlightEnabled ? " !bg-orange-500/95 !text-white hover:!bg-orange-500" : "")
+            }
+            aria-pressed={cursorHighlightEnabled}
+            onClick={onCursorHighlightToggle}
+            aria-label="Cursor highlight"
+          >
+            <Target className="size-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side={tooltipSide}>Cursor highlight</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="transparent"
+            size="small"
+            iconOnly
+            className={
+              "!size-6" +
+              (spotlightEnabled ? " !bg-orange-500/95 !text-white hover:!bg-orange-500" : "")
+            }
+            aria-pressed={spotlightEnabled}
+            onClick={onSpotlightToggle}
+            aria-label="Spotlight"
+          >
+            <Spotlight className="size-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side={tooltipSide}>Spotlight</TooltipContent>
       </Tooltip>
 
       <Separator orientation="vertical" />

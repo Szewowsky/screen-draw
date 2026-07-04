@@ -79,7 +79,7 @@ One `Esc` does the most local thing first:
 
 A separate always-on-top bar on the active display, draggable by its grip; the position persists across restarts (off-screen positions reset to the default bottom-center). The control panel can keep one shared toolbar position, shared tool settings, and shared session ink across displays, or remember toolbar state per display. In per-display mode, dragging stores the active display's position and `⇧T` clears only that display's saved position; shared mode keeps `⇧T` clearing the shared position. Selections, canvas contents, and undo history always remain per display.
 
-Hover any toolbar control to see its name and shortcut where a shortcut exists.
+Hover any toolbar control to see its name and shortcut where a shortcut exists. The toolbar also includes state-reflecting buttons for cursor highlight and spotlight; they have no drawing-mode key, and they stay in sync with the control panel, tray, Settings, and optional global presenter-effect shortcuts.
 
 | Action | Key |
 |---|---|
@@ -93,7 +93,7 @@ Hover any toolbar control to see its name and shortcut where a shortcut exists.
 
 ## Presenter effects
 
-The control panel's **Presenter effects** section and the tray menu include switches for cursor highlight and spotlight. These settings persist with the rest of Screen Draw's preferences and drive the effect overlay state independently from drawing mode.
+The floating toolbar, the control panel's **Presenter effects** section, and the tray menu include switches for cursor highlight and spotlight. These settings persist with the rest of Screen Draw's preferences and drive the effect overlay state independently from drawing mode.
 
 Cursor highlight paints a translucent ring around the pointer. It works while drawing and while Screen Draw is otherwise hidden in effects-only mode. The Settings window includes cursor highlight controls for color, diameter, and opacity.
 
