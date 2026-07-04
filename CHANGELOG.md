@@ -2,6 +2,11 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
+## 1.7.1 — 2026-07-04
+
+### Fixed
+- **Text input lifecycle.** Non-empty text now commits when you click another text point, switch tools, pin annotations, or blur the input; empty inputs cancel. While the caret is open, `⌘Z`/`⌘⇧Z` stay with text editing instead of undoing or redoing canvas shapes.
+
 ## 1.7.0 — 2026-07-03
 
 ### Added

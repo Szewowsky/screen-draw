@@ -56,6 +56,7 @@ let mode: OverlayMode = "hidden";
 let activeDisplayId: number | null = null;
 let displayListenersRegistered = false;
 let deferredOverlayFocusTimer: ReturnType<typeof setTimeout> | null = null;
+let textInputOpen = false;
 
 // Undo/redo use ⌘Z / ⌘⇧Z, which macOS's Edit menu claims as key equivalents and
 // swallows before they ever reach the overlay's keydown handler. Registering them
@@ -67,8 +68,12 @@ const REDO_ACCEL = "CommandOrControl+Shift+Z";
 async function registerDrawingShortcuts(): Promise<void> {
   // Register the more specific Shift+Z first; accelerators match exact modifier
   // sets, so ⌘⇧Z never falls through to the plain ⌘Z handler.
-  globalShortcut.register(REDO_ACCEL, () => broadcast("overlay:redo", {}));
-  globalShortcut.register(UNDO_ACCEL, () => broadcast("overlay:undo", {}));
+  if (!globalShortcut.isRegistered(REDO_ACCEL)) {
+    globalShortcut.register(REDO_ACCEL, () => broadcast("overlay:redo", {}));
+  }
+  if (!globalShortcut.isRegistered(UNDO_ACCEL)) {
+    globalShortcut.register(UNDO_ACCEL, () => broadcast("overlay:undo", {}));
+  }
 }
 
 function unregisterDrawingShortcuts(): void {
@@ -296,6 +301,13 @@ export function focusActiveOverlay(): void {
   if (win && !win.isDestroyed()) win.focus();
 }
 
+export async function setOverlayTextInputOpen(open: boolean): Promise<void> {
+  textInputOpen = open;
+  if (mode !== "drawing") return;
+  if (open) unregisterDrawingShortcuts();
+  else await registerDrawingShortcuts();
+}
+
 function cancelDeferredOverlayFocus(): void {
   if (deferredOverlayFocusTimer === null) return;
   clearTimeout(deferredOverlayFocusTimer);
@@ -400,7 +412,7 @@ async function enterDrawing(options: OverlayActivationOptions): Promise<void> {
     // app — clicks still register (acceptFirstMouse) but keydown shortcuts don't
     // reach the overlay. Defer stealing focus by one frame so the visible toolbar
     // is not gated on macOS app activation while switching between apps.
-    await registerDrawingShortcuts();
+    if (!textInputOpen) await registerDrawingShortcuts();
     deferActiveOverlayFocus();
 
     // Keep keyboard focus on the active overlay: showing the toolbar must not
@@ -416,6 +428,7 @@ async function enterDrawing(options: OverlayActivationOptions): Promise<void> {
  */
 function enterSticky(): void {
   cancelDeferredOverlayFocus();
+  textInputOpen = false;
   unregisterDrawingShortcuts();
   hideToolbarWindow();
 
@@ -439,6 +452,7 @@ function enterSticky(): void {
 /** Full exit: hide everything and release the drawing shortcuts. */
 function enterHidden(): void {
   cancelDeferredOverlayFocus();
+  textInputOpen = false;
   unregisterDrawingShortcuts();
   hideToolbarWindow();
   for (const win of overlayWindows.values()) {

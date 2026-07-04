@@ -295,6 +295,8 @@ export function OverlayView() {
   const activeLaserStrokeRef = useRef<LaserStroke | null>(null);
   const laserLoopActiveRef = useRef(false);
   const textInputStateRef = useRef<TextInputState | null>(null);
+  const textInputOpenRef = useRef(false);
+  const resolvedTextInputsRef = useRef<WeakSet<TextInputState>>(new WeakSet());
   const textInputElementRef = useRef<HTMLInputElement>(null);
   const textMeasureCacheRef = useRef<Map<string, { width: number; height: number }>>(new Map());
   const boardModeRef = useRef<BoardMode>("transparent");
@@ -468,6 +470,14 @@ export function OverlayView() {
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (textInputOpenRef.current) {
+        void window.screenDraw.ipc.invoke("overlay:textInputOpen", false);
+      }
+    };
+  }, []);
+
   /** Store the next model state, repaint, and sync the toolbar's enabled states. */
   const applyModel = useCallback(
     (next: DrawingModel) => {
@@ -510,10 +520,20 @@ export function OverlayView() {
     redraw();
   }, [redraw]);
 
-  const setTextInputState = useCallback((next: TextInputState | null) => {
-    textInputStateRef.current = next;
-    setTextInput(next);
+  const setTextInputOpen = useCallback((open: boolean) => {
+    if (textInputOpenRef.current === open) return;
+    textInputOpenRef.current = open;
+    void window.screenDraw.ipc.invoke("overlay:textInputOpen", open);
   }, []);
+
+  const setTextInputState = useCallback(
+    (next: TextInputState | null) => {
+      textInputStateRef.current = next;
+      setTextInput(next);
+      setTextInputOpen(next !== null);
+    },
+    [setTextInputOpen],
+  );
 
   const setBoardModeState = useCallback(
     (next: BoardMode) => {
@@ -524,15 +544,49 @@ export function OverlayView() {
     [scheduleRedraw],
   );
 
+  const cancelTextInput = useCallback(
+    (state: TextInputState | null = textInputStateRef.current) => {
+      if (!state || resolvedTextInputsRef.current.has(state)) return;
+      resolvedTextInputsRef.current.add(state);
+      if (textInputStateRef.current === state) setTextInputState(null);
+    },
+    [setTextInputState],
+  );
+
+  const commitTextInput = useCallback(
+    (state: TextInputState) => {
+      if (resolvedTextInputsRef.current.has(state)) return;
+      resolvedTextInputsRef.current.add(state);
+      if (textInputStateRef.current === state) setTextInputState(null);
+      if (state.value.length === 0) return;
+      applyModel(
+        addText(
+          modelRef.current,
+          { color: state.color, size: state.size, text: state.value },
+          state.anchor,
+        ),
+      );
+    },
+    [applyModel, setTextInputState],
+  );
+
+  const resolveTextInput = useCallback((state: TextInputState | null = textInputStateRef.current) => {
+    const current = state;
+    if (!current) return;
+    if (current.value.length === 0) cancelTextInput(current);
+    else commitTextInput(current);
+  }, [cancelTextInput, commitTextInput]);
+
   const changeTool = useCallback(
     (next: OverlayTool) => {
+      resolveTextInput();
       setTool(next);
       // Selection only makes sense with the select tool active.
       if (next !== "select") {
         applyModel(selectShape(modelRef.current, null));
       }
     },
-    [applyModel],
+    [applyModel, resolveTextInput],
   );
 
   const undo = useCallback(() => {
@@ -550,24 +604,6 @@ export function OverlayView() {
   const cycleBoardMode = useCallback(() => {
     setBoardModeState(nextBoardMode(boardModeRef.current));
   }, [setBoardModeState]);
-
-  const cancelTextInput = useCallback(() => {
-    setTextInputState(null);
-  }, [setTextInputState]);
-
-  const commitTextInput = useCallback(() => {
-    const current = textInputStateRef.current;
-    if (!current) return;
-    setTextInputState(null);
-    if (current.value.length === 0) return;
-    applyModel(
-      addText(
-        modelRef.current,
-        { color: current.color, size: current.size, text: current.value },
-        current.anchor,
-      ),
-    );
-  }, [applyModel, setTextInputState]);
 
   const startLaserStroke = useCallback(
     (point: Point) => {
@@ -734,12 +770,14 @@ export function OverlayView() {
       markLatencyActivation(p, displayIdRef.current);
       activeRef.current = p.active === true;
       if (p.active) return;
-      if (p.sticky) cancelInteraction();
-      else if (vanishingRef.current) applyModel(createModel());
+      if (p.sticky) {
+        resolveTextInput();
+        cancelInteraction();
+      } else if (vanishingRef.current) applyModel(createModel());
       if (!p.sticky) setBoardModeState("transparent");
     });
     return () => unsub?.();
-  }, [applyModel, cancelInteraction, setBoardModeState]);
+  }, [applyModel, cancelInteraction, resolveTextInput, setBoardModeState]);
 
   // Publish this overlay's full toolbar-facing state to the toolbar window
   // (relayed via main) whenever it changes AND this display is active. The
@@ -829,9 +867,11 @@ export function OverlayView() {
   // global shortcuts while drawing (the Edit menu would otherwise swallow them).
   useEffect(() => {
     const offUndo = window.screenDraw.ipc.on("overlay:undo", () => {
+      if (textInputOpenRef.current) return;
       if (isThisActiveDisplay()) undo();
     });
     const offRedo = window.screenDraw.ipc.on("overlay:redo", () => {
+      if (textInputOpenRef.current) return;
       if (isThisActiveDisplay()) redo();
     });
     return () => {
@@ -949,6 +989,7 @@ export function OverlayView() {
       }
       if (activeTool === "text") {
         drawingRef.current = false;
+        resolveTextInput();
         applyModel(selectShape(modelRef.current, null));
         setTextInputState({
           anchor: p,
@@ -1016,6 +1057,16 @@ export function OverlayView() {
       // visible (and may still hold focus just after pinning), but every key —
       // ⌘Z, C, T, Esc — must reach the app underneath instead of the pinned ink.
       if (!activeRef.current) return;
+      // Never fire overlay shortcuts while typing in a text field — the
+      // keystrokes belong to the input, including native ⌘Z/⌘⇧Z text editing.
+      const target = e.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        return;
+      }
       if (e.key === "Escape") {
         e.preventDefault();
         // Escape cancels an in-progress move (shape snaps back), then drops
@@ -1040,17 +1091,6 @@ export function OverlayView() {
       }
       // Plain single-key shortcuts (skip when a command/control/option modifier is held).
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-
-      // Never fire tool shortcuts while typing in a text field — the keystrokes
-      // belong to the input.
-      const target = e.target;
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        (target instanceof HTMLElement && target.isContentEditable)
-      ) {
-        return;
-      }
 
       if (e.key === "Backspace" || e.key === "Delete") {
         if (modelRef.current.selectedIndex !== null) {
@@ -1168,6 +1208,7 @@ export function OverlayView() {
     updateLaserStroke,
     finishLaserStroke,
     setTextInputState,
+    resolveTextInput,
     measureTextForCanvas,
     cycleBoardMode,
   ]);
@@ -1193,16 +1234,16 @@ export function OverlayView() {
           onChange={(e) => {
             setTextInputState({ ...textInput, value: e.currentTarget.value });
           }}
-          onBlur={commitTextInput}
+          onBlur={() => resolveTextInput(textInput)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
               e.stopPropagation();
-              commitTextInput();
+              commitTextInput(textInput);
             } else if (e.key === "Escape") {
               e.preventDefault();
               e.stopPropagation();
-              cancelTextInput();
+              cancelTextInput(textInput);
             }
           }}
           className="absolute z-10 min-w-40 border-0 bg-transparent p-0 outline-none"

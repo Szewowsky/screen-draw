@@ -23,6 +23,7 @@ import {
   setOverlayActive,
   setOverlayActiveDisplay,
   setOverlaySticky,
+  setOverlayTextInputOpen,
   toggleOverlayVanishing,
 } from "../windows/overlay-window.js";
 import { applyContentProtection } from "../windows/toolbar-window.js";
@@ -70,6 +71,14 @@ export function registerOverlayHandlers(): void {
 
   ipcMain.handle("overlay:toggleVanishing", async () => {
     toggleOverlayVanishing();
+    return overlayState();
+  });
+
+  ipcMain.handle("overlay:textInputOpen", async (_event, open: unknown) => {
+    if (typeof open !== "boolean") {
+      throw new Error("overlay:textInputOpen expects a boolean");
+    }
+    await setOverlayTextInputOpen(open);
     return overlayState();
   });
 
