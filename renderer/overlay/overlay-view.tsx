@@ -70,6 +70,18 @@ interface SetVanishingPayload {
   vanishing?: unknown;
 }
 
+interface CursorEffectState {
+  x: number;
+  y: number;
+}
+
+interface EffectsCursorPayload {
+  displayId?: unknown;
+  visible?: unknown;
+  x?: unknown;
+  y?: unknown;
+}
+
 /** Padding between a selected shape's bounds and the dashed indicator box. */
 const SELECTION_PADDING = 4;
 
@@ -136,6 +148,21 @@ function drawSelectionIndicator(
     bounds.maxX - bounds.minX + SELECTION_PADDING * 2,
     bounds.maxY - bounds.minY + SELECTION_PADDING * 2,
   );
+  ctx.restore();
+}
+
+function drawCursorHighlight(
+  ctx: CanvasRenderingContext2D,
+  settings: ScreenDrawSettings["cursorHighlight"] | null,
+  cursor: CursorEffectState | null,
+) {
+  if (!settings?.enabled || !cursor) return;
+  ctx.save();
+  ctx.globalAlpha = settings.opacity;
+  ctx.fillStyle = settings.color;
+  ctx.beginPath();
+  ctx.arc(cursor.x, cursor.y, settings.size / 2, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
@@ -293,7 +320,10 @@ export function OverlayView() {
   // stay visible (and may still hold focus right after pinning), so the keydown
   // handler must early-out — otherwise `C`/`T`/⌘Z would act on the pinned ink.
   const activeRef = useRef(false);
+  const inkVisibleRef = useRef(false);
   const displayIdRef = useRef(getOverlayDisplayId());
+  const cursorEffectRef = useRef<CursorEffectState | null>(null);
+  const cursorHighlightRef = useRef<ScreenDrawSettings["cursorHighlight"] | null>(null);
 
   const [tool, setTool] = useState<OverlayTool>("pen");
   const [color, setColor] = useState(PALETTE[0].value);
@@ -365,6 +395,14 @@ export function OverlayView() {
     const ctx = ctxRef.current;
     const canvas = canvasRef.current;
     if (!ctx || !canvas) return false;
+    if (!inkVisibleRef.current) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+      drawCursorHighlight(ctx, cursorHighlightRef.current, cursorEffectRef.current);
+      return false;
+    }
     const model = modelRef.current;
     const now = performance.now();
     if (laserStrokesRef.current.length > 0) {
@@ -436,6 +474,7 @@ export function OverlayView() {
       if (model.drag) drawShape(ctx, selected);
       drawSelectionIndicator(ctx, selected, measureTextForCanvas);
     }
+    drawCursorHighlight(ctx, cursorHighlightRef.current, cursorEffectRef.current);
     return hasFadingLaserStroke;
   }, [measureTextForCanvas]);
 
@@ -705,7 +744,9 @@ export function OverlayView() {
       if (typeof next?.defaultSize === "number" && next.defaultSize !== prev?.defaultSize) {
         setSize(next.defaultSize);
       }
+      cursorHighlightRef.current = next.cursorHighlight;
       setRecentColors(Array.isArray(next?.recentColors) ? next.recentColors : []);
+      scheduleRedraw();
       prev = next;
     };
 
@@ -722,7 +763,29 @@ export function OverlayView() {
       });
     })();
     return () => unsub?.();
-  }, []);
+  }, [scheduleRedraw]);
+
+  useEffect(() => {
+    const unsub = window.screenDraw.ipc.on("effects:cursor", (params) => {
+      const payload = (params ?? {}) as EffectsCursorPayload;
+      if (payload.displayId !== displayIdRef.current) return;
+      if (payload.visible === false) {
+        cursorEffectRef.current = null;
+        scheduleRedraw();
+        return;
+      }
+      if (
+        payload.visible !== true ||
+        typeof payload.x !== "number" ||
+        typeof payload.y !== "number"
+      ) {
+        return;
+      }
+      cursorEffectRef.current = { x: payload.x, y: payload.y };
+      scheduleRedraw();
+    });
+    return () => unsub();
+  }, [scheduleRedraw]);
 
   const recordRecentColor = useCallback((value: string) => {
     if (isPaletteColor(value)) return;
@@ -736,9 +799,11 @@ export function OverlayView() {
       try {
         const state = await window.screenDraw.ipc.invoke<OverlayWindowState>("overlay:getState");
         activeRef.current = state.active === true;
+        inkVisibleRef.current = state.active === true || state.sticky === true;
         const nextDisplayId = normalizeDisplayId(state.activeDisplayId);
         activeDisplayIdRef.current = nextDisplayId;
         setActiveDisplayId(nextDisplayId);
+        scheduleRedraw();
       } catch {
         // Fall back to this window's display id from the URL.
       }
@@ -751,7 +816,7 @@ export function OverlayView() {
       });
     })();
     return () => unsub?.();
-  }, []);
+  }, [scheduleRedraw]);
 
   // Cancel any in-progress work and drop the selection so a dashed indicator or a
   // half-drawn stroke never floats over the user's normal work. Run on every
@@ -783,14 +848,19 @@ export function OverlayView() {
       const p = (params as OverlayWindowState | undefined) ?? {};
       markLatencyActivation(p, displayIdRef.current);
       activeRef.current = p.active === true;
-      if (p.active) return;
+      inkVisibleRef.current = p.active === true || p.sticky === true;
+      if (p.active) {
+        scheduleRedraw();
+        return;
+      }
       resolveTextInput();
       cancelInteraction();
       if (!p.sticky && vanishingRef.current) applyModel(createModel());
       if (!p.sticky) setBoardModeState("transparent");
+      scheduleRedraw();
     });
     return () => unsub?.();
-  }, [applyModel, cancelInteraction, resolveTextInput, setBoardModeState]);
+  }, [applyModel, cancelInteraction, resolveTextInput, scheduleRedraw, setBoardModeState]);
 
   // Publish this overlay's full toolbar-facing state to the toolbar window
   // (relayed via main) whenever it changes AND this display is active. The

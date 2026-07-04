@@ -6,6 +6,7 @@ All notable changes to Screen Draw are documented here. Feature descriptions liv
 
 ### Added
 - **Presenter effects foundation.** The control panel and tray now expose cursor highlight and spotlight toggles, settings persist the effect defaults and optional shortcuts, and the main process starts the cursor feed only while an effect is enabled.
+- **Cursor highlight effect.** When enabled, Screen Draw paints a configurable translucent cursor ring above annotations, both while drawing and while only presenter effects are active.
 
 ### Fixed
 - **Text caret focus.** The Text tool now explicitly returns focus to the overlay input when the caret is placed, so typing can start immediately after clicking the screen.

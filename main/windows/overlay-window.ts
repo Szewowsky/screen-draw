@@ -59,6 +59,7 @@ let activeDisplayId: number | null = null;
 let displayListenersRegistered = false;
 let deferredOverlayFocusTimer: ReturnType<typeof setTimeout> | null = null;
 let effectsCursorTimer: ReturnType<typeof setInterval> | null = null;
+let lastEffectsCursorDisplayId: number | null = null;
 let textInputOpen = false;
 
 // Undo/redo use ⌘Z / ⌘⇧Z, which macOS's Edit menu claims as key equivalents and
@@ -143,10 +144,21 @@ function settingsEffectsActive(): boolean {
 function publishEffectsCursor(): void {
   const point = screen.getCursorScreenPoint();
   const display = screen.getDisplayNearestPoint(point);
+  if (lastEffectsCursorDisplayId !== null && lastEffectsCursorDisplayId !== display.id) {
+    const previous = overlayWindows.get(lastEffectsCursorDisplayId);
+    if (previous && !previous.isDestroyed()) {
+      previous.webContents.send("effects:cursor", {
+        displayId: lastEffectsCursorDisplayId,
+        visible: false,
+      });
+    }
+  }
+  lastEffectsCursorDisplayId = display.id;
   const win = overlayWindows.get(display.id);
   if (!win || win.isDestroyed()) return;
   win.webContents.send("effects:cursor", {
     displayId: display.id,
+    visible: true,
     x: point.x - display.bounds.x,
     y: point.y - display.bounds.y,
   });
@@ -162,6 +174,16 @@ function stopEffectsCursorFeed(): void {
   if (effectsCursorTimer === null) return;
   clearInterval(effectsCursorTimer);
   effectsCursorTimer = null;
+  if (lastEffectsCursorDisplayId !== null) {
+    const win = overlayWindows.get(lastEffectsCursorDisplayId);
+    if (win && !win.isDestroyed()) {
+      win.webContents.send("effects:cursor", {
+        displayId: lastEffectsCursorDisplayId,
+        visible: false,
+      });
+    }
+  }
+  lastEffectsCursorDisplayId = null;
 }
 
 function hideOverlayWindows(): void {

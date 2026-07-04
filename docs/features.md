@@ -90,6 +90,8 @@ Hover any toolbar control to see its name and shortcut where a shortcut exists.
 
 The control panel's **Presenter effects** section and the tray menu include switches for cursor highlight and spotlight. These settings persist with the rest of Screen Draw's preferences and drive the effect overlay state independently from drawing mode.
 
+Cursor highlight paints a translucent ring around the pointer. It works while drawing and while Screen Draw is otherwise hidden in effects-only mode. The Settings window includes cursor highlight controls for color, diameter, and opacity.
+
 ## App presence
 
 Screen Draw is a menu-bar app: no Dock icon. The tray (menu bar) icon offers Show Control Panel, Toggle Drawing, Cursor Highlight, Spotlight, Settings…, and Quit.

@@ -1,9 +1,12 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import {
+  ColorWell,
   Label,
   RadioGroup,
   RadioGroupItem,
   ScrollArea,
+  Slider,
+  Switch,
   Toolbar,
   ToolbarContent,
   ToolbarTitle,
@@ -14,20 +17,25 @@ import {
   FieldSet,
   toast,
 } from "../components/ui";
+import type { ScreenDrawSettings } from "../overlay/constants";
 
 type NativeThemeInfo = {
   themeSource: "system" | "light" | "dark";
   shouldUseDarkColors: boolean;
 };
 
-type ScreenDrawSettings = {
-  hideToolbarInRecordings: boolean;
+const DEFAULT_CURSOR_HIGHLIGHT: ScreenDrawSettings["cursorHighlight"] = {
+  enabled: false,
+  color: "#FFD60A",
+  size: 60,
+  opacity: 0.35,
 };
 
 export function SettingsView() {
   const [themeInfo, setThemeInfo] = useState<NativeThemeInfo | null>(null);
   const [_isLoading, setIsLoading] = useState(true);
   const [hideToolbarInRecordings, setHideToolbarInRecordings] = useState(false);
+  const [cursorHighlight, setCursorHighlight] = useState(DEFAULT_CURSOR_HIGHLIGHT);
 
   // Close settings window on Escape, unless an interactive element is focused or a popover is open
   useEffect(() => {
@@ -72,15 +80,20 @@ export function SettingsView() {
     refreshThemeInfo();
   }, []);
 
-  // Load the recording toggle and follow changes made elsewhere (e.g. Shift+R
-  // while drawing).
+  // Load persisted app settings and follow changes made elsewhere (e.g. tray
+  // toggles or Shift+R while drawing).
   useEffect(() => {
+    const applySettings = (settings: ScreenDrawSettings) => {
+      setHideToolbarInRecordings(settings.hideToolbarInRecordings === true);
+      setCursorHighlight(settings.cursorHighlight ?? DEFAULT_CURSOR_HIGHLIGHT);
+    };
+
     void window.screenDraw.ipc
       .invoke<ScreenDrawSettings>("settings:get")
-      .then((s) => setHideToolbarInRecordings(s.hideToolbarInRecordings === true))
+      .then(applySettings)
       .catch(() => {});
     const unsub = window.screenDraw.ipc.on("settings:changed", (params) => {
-      setHideToolbarInRecordings((params as ScreenDrawSettings).hideToolbarInRecordings === true);
+      applySettings(params as ScreenDrawSettings);
     });
     return () => unsub();
   }, []);
@@ -106,6 +119,19 @@ export function SettingsView() {
       toast.error(`Failed to update setting: ${error}`);
     }
   };
+
+  const updateCursorHighlight = useCallback(
+    (partial: Partial<ScreenDrawSettings["cursorHighlight"]>) => {
+      setCursorHighlight((current) => ({ ...current, ...partial }));
+      void window.screenDraw.ipc
+        .invoke<ScreenDrawSettings>("settings:setDefaults", {
+          cursorHighlight: partial,
+        })
+        .then((settings) => setCursorHighlight(settings.cursorHighlight))
+        .catch((error) => toast.error(`Failed to update cursor highlight: ${error}`));
+    },
+    [],
+  );
 
   return (
     <ScrollArea
@@ -163,6 +189,71 @@ export function SettingsView() {
                   On
                 </Label>
               </RadioGroup>
+            </Field>
+          </FieldGroup>
+        </FieldSet>
+
+        <FieldSet title="Cursor highlight">
+          <FieldGroup>
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldLabel htmlFor="cursor-highlight-enabled">Enabled</FieldLabel>
+              </FieldContent>
+              <Switch
+                checked={cursorHighlight.enabled}
+                onCheckedChange={(enabled) => void updateCursorHighlight({ enabled })}
+                aria-label="Cursor highlight"
+              />
+            </Field>
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldLabel htmlFor="cursor-highlight-color">Color</FieldLabel>
+              </FieldContent>
+              <ColorWell
+                id="cursor-highlight-color"
+                value={cursorHighlight.color}
+                onChange={(color) => void updateCursorHighlight({ color })}
+                size="small"
+                aria-label="Cursor highlight color"
+              />
+            </Field>
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldLabel htmlFor="cursor-highlight-size">Diameter</FieldLabel>
+              </FieldContent>
+              <Slider
+                variant="filled"
+                size="small"
+                className="w-44"
+                value={[cursorHighlight.size]}
+                min={24}
+                max={160}
+                step={1}
+                onValueChange={(value) => void updateCursorHighlight({ size: value[0] })}
+                endContent={(value) => <span className="tabular-nums">{value}px</span>}
+                endContentClassName="min-w-14"
+                aria-label="Cursor highlight diameter"
+              />
+            </Field>
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldLabel htmlFor="cursor-highlight-opacity">Opacity</FieldLabel>
+              </FieldContent>
+              <Slider
+                variant="filled"
+                size="small"
+                className="w-44"
+                value={[Math.round(cursorHighlight.opacity * 100)]}
+                min={10}
+                max={100}
+                step={5}
+                onValueChange={(value) =>
+                  void updateCursorHighlight({ opacity: (value[0] ?? 35) / 100 })
+                }
+                endContent={(value) => <span className="tabular-nums">{value}%</span>}
+                endContentClassName="min-w-14"
+                aria-label="Cursor highlight opacity"
+              />
             </Field>
           </FieldGroup>
         </FieldSet>
