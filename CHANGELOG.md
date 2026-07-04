@@ -2,7 +2,7 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
-## Unreleased
+## 1.8.0 — 2026-07-04
 
 ### Added
 - **Presenter effects foundation.** The control panel and tray now expose cursor highlight and spotlight toggles, settings persist the effect defaults and optional shortcuts, and the main process starts the cursor feed only while an effect is enabled.

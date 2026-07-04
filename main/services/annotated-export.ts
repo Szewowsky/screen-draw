@@ -10,6 +10,7 @@ import {
   ipcMain,
   nativeImage,
   Notification,
+  systemPreferences,
 } from "electron";
 
 import { logger } from "../logger.js";
@@ -59,6 +60,20 @@ function notifyFailure(error: unknown): void {
   }).show();
 }
 
+/**
+ * Actionable permission guidance, read AFTER a failed capture attempt — the
+ * attempt itself is what registers the app in the Screen Recording list and
+ * triggers the system prompt, so this must never gate the getSources call.
+ */
+function screenPermissionHint(): string {
+  const status = systemPreferences.getMediaAccessStatus("screen");
+  if (status === "granted") return "Capture failed despite granted Screen Recording permission.";
+  return (
+    "Enable Screen Draw under System Settings → Privacy & Security → Screen Recording, " +
+    "then relaunch the app."
+  );
+}
+
 async function captureActiveDisplay(): Promise<string> {
   const display = getActiveDisplay();
   if (!display) throw new Error("No active display to export");
@@ -74,12 +89,10 @@ async function captureActiveDisplay(): Promise<string> {
   const source =
     sources.find((candidate) => candidate.display_id === String(display.id)) ?? sources[0];
   if (!source) {
-    throw new Error("No screen capture source available. Check macOS Screen Recording permission.");
+    throw new Error(`No screen capture source available. ${screenPermissionHint()}`);
   }
   if (source.thumbnail.isEmpty()) {
-    throw new Error(
-      "Screen capture returned an empty image. Check macOS Screen Recording permission.",
-    );
+    throw new Error(`Screen capture returned an empty image. ${screenPermissionHint()}`);
   }
   return source.thumbnail.toDataURL();
 }
