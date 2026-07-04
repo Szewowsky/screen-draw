@@ -11,6 +11,7 @@ import { appHandlers } from "./app.js";
 import { registerOverlayHandlers } from "./overlay.js";
 import { registerToolbarHandlers } from "./toolbar.js";
 import { getSettingsWindow, openSettingsWindow } from "../windows/settings-window.js";
+import { exportAnnotatedScreenshot } from "../services/annotated-export.js";
 import { registerLatencyProbeHandlers } from "../services/latency-probe.js";
 
 import { ipcMain, nativeTheme } from "electron";
@@ -60,6 +61,9 @@ export function registerHandlers(): void {
   registerOverlayHandlers();
   // Toolbar window ⇄ overlay bridge
   registerToolbarHandlers();
+  ipcMain.handle("export:annotatedScreenshot", async () => {
+    return await exportAnnotatedScreenshot();
+  });
   // Env-gated latency probe; registers nothing unless SCREEN_DRAW_LAT=1.
   registerLatencyProbeHandlers();
 

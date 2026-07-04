@@ -47,6 +47,7 @@ import {
   type Shape,
 } from "./drawing-model";
 import { EPHEMERAL_HOLD_MS, ephemeralAlpha, pruneExpiredEphemerals } from "./ephemeral-ink";
+import { resolveExportScale } from "./export-composite";
 import { freehandPathCommands, type FreehandPathCommand } from "./smooth-path";
 
 interface OverlayWindowState {
@@ -80,6 +81,15 @@ interface EffectsCursorPayload {
   visible?: unknown;
   x?: unknown;
   y?: unknown;
+}
+
+interface ExportComposePayload {
+  requestId?: unknown;
+  screenshotDataUrl?: unknown;
+  display?: {
+    width?: unknown;
+    height?: unknown;
+  };
 }
 
 /** Padding between a selected shape's bounds and the dashed indicator box. */
@@ -204,6 +214,67 @@ function drawSpotlight(
   ctx.arc(cursor.x, cursor.y, outerRadius, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Failed to load screenshot capture"));
+    image.src = src;
+  });
+}
+
+function exportComposePayload(raw: unknown): {
+  requestId: string;
+  screenshotDataUrl: string;
+  display: { width: number; height: number };
+} {
+  const payload = (raw ?? {}) as ExportComposePayload;
+  if (typeof payload.requestId !== "string") {
+    throw new Error("Export request is missing a request id");
+  }
+  if (typeof payload.screenshotDataUrl !== "string") {
+    throw new Error("Export request is missing a screenshot");
+  }
+  if (typeof payload.display?.width !== "number" || typeof payload.display.height !== "number") {
+    throw new Error("Export request is missing display dimensions");
+  }
+  return {
+    requestId: payload.requestId,
+    screenshotDataUrl: payload.screenshotDataUrl,
+    display: { width: payload.display.width, height: payload.display.height },
+  };
+}
+
+async function composeAnnotatedExport(
+  raw: unknown,
+  shapes: readonly Shape[],
+  boardMode: BoardMode,
+): Promise<{ requestId: string; pngDataUrl: string }> {
+  const payload = exportComposePayload(raw);
+  const image = await loadImage(payload.screenshotDataUrl);
+  const canvas = document.createElement("canvas");
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not create export canvas");
+
+  ctx.drawImage(image, 0, 0);
+  if (boardMode !== "transparent") {
+    ctx.fillStyle = BOARD_COLORS[boardMode];
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  const scale = resolveExportScale({ width: canvas.width, height: canvas.height }, payload.display);
+  ctx.save();
+  ctx.scale(scale.scaleX, scale.scaleY);
+  for (const shape of shapes) {
+    drawShape(ctx, shape);
+  }
+  ctx.restore();
+
+  return { requestId: payload.requestId, pngDataUrl: canvas.toDataURL("image/png") };
 }
 
 function getOverlayDisplayId(): number | null {
@@ -831,6 +902,26 @@ export function OverlayView() {
     return () => unsub();
   }, [scheduleRedraw]);
 
+  useEffect(() => {
+    const unsub = window.screenDraw.ipc.on("export:compose", (params) => {
+      const requestId =
+        typeof (params as ExportComposePayload | undefined)?.requestId === "string"
+          ? ((params as ExportComposePayload).requestId as string)
+          : "";
+      void composeAnnotatedExport(params, modelRef.current.shapes, boardModeRef.current)
+        .then((result) => {
+          window.screenDraw.ipc.send("export:composeResult", result);
+        })
+        .catch((error) => {
+          window.screenDraw.ipc.send("export:composeResult", {
+            requestId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+    });
+    return () => unsub();
+  }, []);
+
   const recordRecentColor = useCallback((value: string) => {
     if (isPaletteColor(value)) return;
     void window.screenDraw.ipc.invoke("settings:setDefaults", { recentColor: value });
@@ -1296,6 +1387,12 @@ export function OverlayView() {
       if (key === "w") {
         e.preventDefault();
         cycleBoardMode();
+        return;
+      }
+
+      if (key === "d") {
+        e.preventDefault();
+        void window.screenDraw.ipc.invoke("export:annotatedScreenshot").catch(() => {});
         return;
       }
 

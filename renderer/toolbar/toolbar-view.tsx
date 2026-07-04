@@ -494,6 +494,7 @@ export function ToolbarView() {
           onRedo={() => action({ type: "redo" })}
           canClear={history.hasShapes}
           onClear={() => action({ type: "clear" })}
+          onExport={() => action({ type: "export" })}
           onExit={() => action({ type: "exit" })}
         />
       </div>

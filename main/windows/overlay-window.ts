@@ -434,6 +434,31 @@ export function getActiveDisplayId(): number | null {
   return activeDisplayId;
 }
 
+export function getActiveDisplay(): Display | null {
+  return activeDisplayId === null ? null : (getDisplayById(activeDisplayId) ?? null);
+}
+
+export function getActiveOverlayWindow(): BrowserWindow | null {
+  if (activeDisplayId === null) return null;
+  const win = overlayWindows.get(activeDisplayId);
+  return win && !win.isDestroyed() ? win : null;
+}
+
+export function getOverlayWindows(): BrowserWindow[] {
+  return [...overlayWindows.values()].filter((win) => !win.isDestroyed());
+}
+
+export async function withOverlayWindowsHiddenForCapture<T>(action: () => Promise<T>): Promise<T> {
+  hideToolbarWindow();
+  hideOverlayWindows();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  try {
+    return await action();
+  } finally {
+    await syncOverlayWindows();
+  }
+}
+
 export async function setOverlayActiveDisplay(displayId: number): Promise<void> {
   if (!getDisplayById(displayId)) {
     throw new Error(`Unknown display id: ${displayId}`);

@@ -62,6 +62,10 @@ Board mode is per display and resets to transparent on a full exit. Pinning whil
 - **⌘Z** undo, **⌘⇧Z** redo — work globally while drawing (registered as system-wide shortcuts). Moves, deletes, and clear-all are undoable; history holds the last 100 operations per display.
 - **`C`** clears the active display's canvas (undoable).
 
+## Export annotated screenshot — `D`
+
+Press `D` while drawing, or click the toolbar camera button, to save the active display as a PNG in `~/Downloads` and copy the same image to the clipboard. Export uses the committed annotation model for that display, so temporary laser strokes, selection outlines, and in-progress shapes are left out. If board mode is visible, the board background is included.
+
 ## Escape layering
 
 One `Esc` does the most local thing first:
@@ -79,6 +83,7 @@ Hover any toolbar control to see its name and shortcut where a shortcut exists.
 
 | Action | Key |
 |---|---|
+| Export annotated screenshot | `D` |
 | Pin annotations (sticky, click-through) | `S` |
 | Hide / show the toolbar (this session) | `T` |
 | Reset toolbar to the default position (shared, or active display in per-display mode) | `⇧T` |

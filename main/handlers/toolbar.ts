@@ -24,6 +24,7 @@
 import { ipcMain } from "electron";
 
 import { broadcast } from "../services/events.js";
+import { exportAnnotatedScreenshot } from "../services/annotated-export.js";
 import { cacheToolbarState, getCachedToolbarState } from "../services/toolbar-state-cache.js";
 import {
   getActiveDisplayId,
@@ -93,6 +94,12 @@ export function registerToolbarHandlers(): void {
     if (type === "toggleVanishing") {
       focusActiveOverlay();
       toggleOverlayVanishing();
+      return;
+    }
+
+    if (type === "export") {
+      await exportAnnotatedScreenshot();
+      focusActiveOverlay();
       return;
     }
 

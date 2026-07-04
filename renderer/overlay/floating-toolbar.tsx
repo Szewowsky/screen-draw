@@ -35,6 +35,7 @@ import {
 } from "../components/ui";
 import {
   ArrowUpRight,
+  Camera,
   Circle,
   Eraser,
   Ghost,
@@ -140,6 +141,7 @@ interface FloatingToolbarProps {
   onRedo: () => void;
   canClear: boolean;
   onClear: () => void;
+  onExport: () => void;
   onExit: () => void;
 }
 
@@ -171,6 +173,7 @@ export function FloatingToolbar({
   onRedo,
   canClear,
   onClear,
+  onExport,
   onExit,
 }: FloatingToolbarProps) {
   const dragging = useRef(false);
@@ -464,6 +467,24 @@ export function FloatingToolbar({
         </TooltipTrigger>
         <TooltipContent side={tooltipSide} shortcut={["C"]}>
           Clear all
+        </TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="transparent"
+            size="small"
+            iconOnly
+            className="!size-6"
+            onClick={onExport}
+            aria-label="Export screenshot"
+          >
+            <Camera className="size-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side={tooltipSide} shortcut={["D"]}>
+          Export screenshot
         </TooltipContent>
       </Tooltip>
 
