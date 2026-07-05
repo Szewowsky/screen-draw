@@ -1,82 +1,82 @@
 # Screen Draw
 
-🇵🇱 [Wersja polska](README.pl.md)
+🇬🇧 [English version](README.en.md)
 
-**Draw on your screen.** A fast, keyboard-driven macOS annotation tool for tutorials, live demos, and presentations — pen, shapes, text, a fading laser pointer, cursor highlight, and spotlight, all floating above whatever you're showing.
+**Rysuj po ekranie.** Szybkie, sterowane klawiaturą narzędzie do adnotacji na macOS — do tutoriali, live demo i prezentacji: pisak, kształty, tekst, gasnący wskaźnik laserowy, podświetlenie kursora i spotlight, wszystko ponad tym, co właśnie pokazujesz.
 
-![Screen Draw annotations](docs/assets/hero-annotations.png)
+![Adnotacje Screen Draw](docs/assets/hero-annotations.png)
 
-## Why
+## Po co
 
-Made for presenters and tutorial creators who want to point at things *right now*: one global shortcut and you're drawing over any app, full-screen video calls included. Everything is a single keypress away, the overlay costs ~0% CPU when idle, and annotations never end up where you can't undo them.
+Dla prezenterów i twórców tutoriali, którzy chcą wskazać coś *teraz*: jeden globalny skrót i rysujesz po dowolnej aplikacji, łącznie z pełnoekranowymi wideorozmowami. Wszystko jest o jeden klawisz stąd, overlay w spoczynku kosztuje ~0% CPU, a adnotacje nigdy nie lądują tam, skąd nie da się ich cofnąć.
 
-## Features
+## Funkcje
 
-### Drawing tools
+### Narzędzia rysowania
 
-![Floating toolbar](docs/assets/toolbar.png)
+![Pływający pasek narzędzi](docs/assets/toolbar.png)
 
-| Tool | Key | Notes |
+| Narzędzie | Klawisz | Uwagi |
 |---|---|---|
-| Select & move | `V` | Grab, drag, restyle, or delete any committed annotation |
-| Pen | `P` | Smoothed freehand ink; hold `⇧` for a straight line |
-| Highlighter | `H` | Wide translucent band |
-| Laser pointer | `F` | Glowing stroke that holds briefly, then fades — never enters undo/clear |
-| Eraser | `E` | Drag across strokes to remove them; one drag = one undo step |
-| Text | `X` | Click, type, `Enter` — then select/move/restyle it like any shape |
-| Line / Arrow | `L` / `A` | Hold `⇧` to snap to 45° |
-| Rectangle / Ellipse | `R` / `O` | Hold `⇧` for square / circle |
+| Zaznacz i przesuń | `V` | Złap, przeciągnij, przestyluj lub usuń dowolną adnotację |
+| Pisak | `P` | Wygładzony odręczny tusz; przytrzymaj `⇧` dla prostej linii |
+| Zakreślacz | `H` | Szeroki, półprzezroczysty pas |
+| Wskaźnik laserowy | `F` | Świecąca kreska, która chwilę wisi i gaśnie — nie wchodzi do undo/wyczyść |
+| Gumka | `E` | Przeciągnij po kreskach, by je usunąć; jedno pociągnięcie = jeden krok undo |
+| Tekst | `X` | Klik, piszesz, `Enter` — potem zaznaczasz/przesuwasz/stylujesz jak każdy kształt |
+| Linia / Strzałka | `L` / `A` | Przytrzymaj `⇧`, by przyciągać do 45° |
+| Prostokąt / Elipsa | `R` / `O` | Przytrzymaj `⇧` dla kwadratu / koła |
 
-Plus: colors `1`–`6` + custom picker with recents, brush size `[` `]`, undo/redo `⌘Z` / `⌘⇧Z`, clear `C`, board mode `W` (transparent → whiteboard → blackboard), session ink `G` (auto-clean slate on exit), pin annotations `S` (keep them on screen, click-through), export annotated screenshot `D` (PNG to `~/Downloads` + clipboard), hide toolbar `T`, hide toolbar from recordings `⇧R`. Full guide: [docs/features.md](docs/features.md).
+Do tego: kolory `1`–`6` + własny picker z ostatnio używanymi, rozmiar pędzla `[` `]`, cofnij/ponów `⌘Z` / `⌘⇧Z`, wyczyść `C`, tryb tablicy `W` (przezroczysty → biała → czarna), tusz sesyjny `G` (czysta karta przy wyjściu), przypięcie adnotacji `S` (zostają na ekranie, kliknięcia przechodzą przez nie), eksport zrzutu z adnotacjami `D` (PNG do `~/Downloads` + schowek), ukrycie paska `T`, pasek niewidoczny w nagraniach `⇧R`. Pełny przewodnik: [docs/features.md](docs/features.md) (EN).
 
-### Presenter effects
+### Efekty prezenterskie
 
-Work even when you're **not** drawing — toggle from the toolbar, control panel, or menu-bar tray:
+Działają także **poza** trybem rysowania — włączysz z paska, panelu albo ikonki w pasku menu:
 
-- **Cursor highlight** — a configurable ring around your pointer, impossible to lose.
-- **Spotlight** — dims everything outside a feathered circle around the cursor.
+- **Podświetlenie kursora** — konfigurowalny pierścień wokół wskaźnika, nie do zgubienia.
+- **Spotlight** — przyciemnia wszystko poza miękkim kołem wokół kursora.
 
-### Multi-display
+### Wiele ekranów
 
-One overlay per display; hover to switch. The toolbar follows you, with a choice of one shared position + tool settings across displays, or independent per-display setups.
+Jeden overlay na każdy wyświetlacz; najedź, by przełączyć. Pasek narzędzi podąża za Tobą — do wyboru: wspólna pozycja + ustawienia narzędzi na wszystkich ekranach albo niezależne per ekran.
 
-### Control panel
+### Panel sterowania
 
-<img src="docs/assets/control-panel.png" width="380" alt="Control panel" />
+<img src="docs/assets/control-panel.png" width="380" alt="Panel sterowania" />
 
-Global activation shortcut (default `⌘⇧D`), defaults, toolbar behavior, presenter effects, launch at login.
+Globalny skrót aktywacji (domyślnie `⌘⇧D`), ustawienia domyślne, zachowanie paska, efekty prezenterskie, uruchamianie przy logowaniu.
 
-## Install
+## Instalacja
 
-Grab `Screen Draw-<version>-arm64.dmg` (Apple Silicon), drag the app to `/Applications`, then — because the build is unsigned — on first run:
+Pobierz `Screen Draw-<wersja>-arm64.dmg` (Apple Silicon), przeciągnij appkę do `/Applications`, a potem — ponieważ build jest niepodpisany — przy pierwszym uruchomieniu:
 
-1. **Right-click the app → Open → Open** (or, on newer macOS: System Settings → **Privacy & Security** → "Open Anyway").
-2. Grant **Screen Recording** and **Accessibility** when prompted (needed to draw over other apps and to export screenshots).
+1. **Prawy klik na appce → Otwórz → Otwórz** (lub na nowszych macOS: Ustawienia systemowe → **Prywatność i ochrona** → „Otwórz mimo to").
+2. Zezwól na **Nagrywanie ekranu** i **Dostępność**, gdy system poprosi (potrzebne do rysowania nad innymi aplikacjami i eksportu zrzutów).
 
-> **Where do I get the .dmg?** Prebuilt, ready-to-run builds are a thank-you gift for community members and supporters. You can always build it yourself from source (below) — same app, zero restrictions.
+> **Skąd wziąć .dmg?** Gotowe buildy to podziękowanie dla członków społeczności i wspierających. Zawsze możesz też zbudować appkę sam ze źródeł (niżej) — ta sama aplikacja, zero ograniczeń.
 
-## Build from source
+## Budowanie ze źródeł
 
-Requirements: macOS (Apple Silicon), Node ≥ 22, npm.
+Wymagania: macOS (Apple Silicon), Node ≥ 22, npm.
 
 ```bash
 git clone https://github.com/Szewowsky/screen-draw.git
 cd screen-draw
 npm ci
-npm run dev        # build + launch
-npm run dist       # build the .dmg into dist/
+npm run dev        # build + uruchomienie
+npm run dist       # budowa .dmg do dist/
 ```
 
-Checks: `npm run lint`, `npm run type-check`, `npm test` (Vitest over the pure drawing model — 150+ tests). Release history: [CHANGELOG.md](CHANGELOG.md).
+Kontrole: `npm run lint`, `npm run type-check`, `npm test` (Vitest na czystym modelu rysowania — 150+ testów). Historia wydań: [CHANGELOG.md](CHANGELOG.md).
 
-## Built with AI agents
+## Budowane z agentami AI
 
-Screen Draw is developed spec-first through an AI-agent workflow: PRDs and fully-specified issues authored by Claude, autonomous implementation runs, and every release gated on lint + type-check + tests. The [issue history](https://github.com/Szewowsky/screen-draw/issues?q=is%3Aissue) tells the story — including the performance investigations where proposed refactors were measured and rejected.
+Screen Draw powstaje „spec-first" w workflow agentowym: PRD-y i w pełni wyspecyfikowane issues pisze Claude, implementacja biegnie autonomicznie, a każde wydanie przechodzi bramki lint + type-check + testy. Historię opowiada [lista issues](https://github.com/Szewowsky/screen-draw/issues?q=is%3Aissue) — łącznie ze śledztwami wydajnościowymi, w których proponowane refaktory zostały zmierzone i odrzucone.
 
-## Tech
+## Technologia
 
-Electron 43 · TypeScript · React 19 (with React Compiler) · Tailwind 4 · Vite 8 · Vitest. Transparent always-on-top overlay windows (one per display), a pure immutable drawing model with undo/redo, offscreen-cached rendering with ≤1 repaint per frame, and zero idle work.
+Electron 43 · TypeScript · React 19 (z React Compilerem) · Tailwind 4 · Vite 8 · Vitest. Przezroczyste okna overlay zawsze-na-wierzchu (po jednym na ekran), czysty niemutowalny model rysowania z undo/redo, renderowanie z cache'em offscreen i ≤1 przerysowaniem na klatkę, zero pracy w spoczynku.
 
-## License
+## Licencja
 
-[MIT](LICENSE) — the code is free. If Screen Draw saves your demo one day, consider supporting the project. 🧡
+[MIT](LICENSE) — kod jest darmowy. Jeśli Screen Draw uratuje kiedyś Twoje demo, rozważ wsparcie projektu. 🧡
