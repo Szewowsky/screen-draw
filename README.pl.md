@@ -69,9 +69,9 @@ npm run dist       # budowa .dmg do dist/
 
 Kontrole: `npm run lint`, `npm run type-check`, `npm test` (Vitest na czystym modelu rysowania — 150+ testów). Historia wydań: [CHANGELOG.md](CHANGELOG.md).
 
-## Budowane jawnie, z agentami AI
+## Budowane z agentami AI
 
-Ta aplikacja powstaje w workflow agentowym: PRD-y i issues pisze Claude, implementacja biegnie autonomicznie (agenci Codex / Claude), każde wydanie przechodzi lint + type-check + testy, a cały proces zostaje w repo — zobacz [`docs/prd/`](docs/prd/), pliki `docs/*-backlog.md` i [historię issues](https://github.com/Szewowsky/screen-draw/issues?q=is%3Aissue). Udokumentowane są nawet śledztwa wydajnościowe (instrumentacja latencji, refaktory odrzucone pomiarem). Jeśli ciekawi Cię, dokąd sięga rozwój oprogramowania „spec-first" z agentami — to repo jest żywym okazem.
+Screen Draw powstaje „spec-first" w workflow agentowym: PRD-y i w pełni wyspecyfikowane issues pisze Claude, implementacja biegnie autonomicznie, a każde wydanie przechodzi bramki lint + type-check + testy. Historię opowiada [lista issues](https://github.com/Szewowsky/screen-draw/issues?q=is%3Aissue) — łącznie ze śledztwami wydajnościowymi, w których proponowane refaktory zostały zmierzone i odrzucone.
 
 ## Technologia
 

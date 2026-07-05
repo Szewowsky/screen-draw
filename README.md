@@ -69,9 +69,9 @@ npm run dist       # build the .dmg into dist/
 
 Checks: `npm run lint`, `npm run type-check`, `npm test` (Vitest over the pure drawing model — 150+ tests). Release history: [CHANGELOG.md](CHANGELOG.md).
 
-## Built in the open, with AI agents
+## Built with AI agents
 
-This app is developed through an AI-agent workflow: PRDs and slice issues are authored by Claude, implementation runs autonomously (Codex / Claude agents), every release passes lint + type-check + tests, and the whole process is preserved in the repo — see [`docs/prd/`](docs/prd/), the `docs/*-backlog.md` drain files, and the [issue history](https://github.com/Szewowsky/screen-draw/issues?q=is%3Aissue). Even the performance investigations (latency instrumentation, measured-and-rejected refactors) are documented. If you're curious how far spec-first agent development can go — this repo is a live specimen.
+Screen Draw is developed spec-first through an AI-agent workflow: PRDs and fully-specified issues authored by Claude, autonomous implementation runs, and every release gated on lint + type-check + tests. The [issue history](https://github.com/Szewowsky/screen-draw/issues?q=is%3Aissue) tells the story — including the performance investigations where proposed refactors were measured and rejected.
 
 ## Tech
 
