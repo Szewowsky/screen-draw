@@ -1,5 +1,7 @@
 # Screen Draw
 
+🇵🇱 [Wersja polska](README.pl.md)
+
 **Draw on your screen.** A fast, keyboard-driven macOS annotation tool for tutorials, live demos, and presentations — pen, shapes, text, a fading laser pointer, cursor highlight, and spotlight, all floating above whatever you're showing.
 
 ![Screen Draw annotations](docs/assets/hero-annotations.png)
