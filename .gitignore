@@ -24,3 +24,5 @@ docs/agents/
 docs/prd/
 docs/*-backlog.md
 docs/*audit*.md
+.mcp.json
+AGENTS.md
