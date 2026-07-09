@@ -66,6 +66,8 @@ Board mode is per display and resets to transparent on a full exit. Pinning whil
 
 Press `D` while drawing, or click the toolbar camera button, to save the active display as a PNG in `~/Downloads` and copy the same image to the clipboard. Export uses the committed annotation model for that display, so temporary laser strokes, selection outlines, and in-progress shapes are left out. If board mode is visible, the board background is included.
 
+Export needs macOS **Screen Recording** permission (System Settings → Privacy & Security → Screen Recording). macOS applies the permission when the app launches, so after granting it, quit and reopen Screen Draw before exporting again — the failure notification says so when that's the situation.
+
 ## Escape layering
 
 One `Esc` does the most local thing first:

@@ -4,6 +4,9 @@ All notable changes to Screen Draw are documented here. Feature descriptions liv
 
 ## 1.9.0 — 2026-07-09
 
+### Fixed
+- **Clearer guidance when export can't capture the screen.** When Screen Recording is already enabled but macOS hasn't applied it to the running process yet (the permission takes effect at launch), the export failure notification now says to quit and reopen Screen Draw instead of reporting an unexplained failure.
+
 ### Added
 - **Light appearance across app chrome.** The Theme setting now switches the control panel, Settings window, floating toolbar, controls, and popovers between coordinated light and dark palettes. System follows macOS appearance live, explicit Light or Dark applies immediately, and the choice persists across restarts; the transparent drawing overlay remains unchanged.
 - **Background updates with a restart prompt.** Installed builds now check the signed GitHub Releases feed on launch and periodically, download newer versions in the background, and show **Install & Restart** or **Later** in the control panel when an update is ready. Development builds skip the updater, and network failures stay silent.

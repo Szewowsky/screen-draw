@@ -67,7 +67,12 @@ function notifyFailure(error: unknown): void {
  */
 function screenPermissionHint(): string {
   const status = systemPreferences.getMediaAccessStatus("screen");
-  if (status === "granted") return "Capture failed despite granted Screen Recording permission.";
+  if (status === "granted") {
+    return (
+      "Screen Recording is granted, but macOS applies it when the app launches — " +
+      "quit and reopen Screen Draw, then try again."
+    );
+  }
   return (
     "Enable Screen Draw under System Settings → Privacy & Security → Screen Recording, " +
     "then relaunch the app."
