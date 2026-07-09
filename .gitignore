@@ -9,6 +9,10 @@ out/
 # Installers
 *.dmg
 
+# Secrets — never commit
+.env
+.env.local
+
 # OS files
 .DS_Store
 Thumbs.db
