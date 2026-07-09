@@ -18,11 +18,7 @@ import {
   toast,
 } from "../components/ui";
 import type { ScreenDrawSettings } from "../overlay/constants";
-
-type NativeThemeInfo = {
-  themeSource: "system" | "light" | "dark";
-  shouldUseDarkColors: boolean;
-};
+import type { NativeThemeInfo, ThemeSource } from "../../main/services/theme";
 
 const DEFAULT_CURSOR_HIGHLIGHT: ScreenDrawSettings["cursorHighlight"] = {
   enabled: false,
@@ -107,7 +103,7 @@ export function SettingsView() {
   }, []);
 
   const handleThemeChange = async (value: string) => {
-    const source = value as "system" | "light" | "dark";
+    const source = value as ThemeSource;
     try {
       await window.screenDraw.nativeTheme.setThemeSource(source);
       await refreshThemeInfo();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveEffectiveTheme } from "../main/services/theme";
+import { readEffectiveTheme, resolveEffectiveTheme } from "../main/services/theme";
 
 describe("resolveEffectiveTheme", () => {
   it("follows a dark system appearance in system mode", () => {
@@ -16,5 +16,14 @@ describe("resolveEffectiveTheme", () => {
 
   it("keeps an explicit dark theme when the system is light", () => {
     expect(resolveEffectiveTheme("dark", false)).toBe("dark");
+  });
+});
+
+describe("readEffectiveTheme", () => {
+  it("reads renderer payloads and rejects invalid theme values", () => {
+    expect(readEffectiveTheme({ effectiveTheme: "light" })).toBe("light");
+    expect(readEffectiveTheme({ effectiveTheme: "dark" })).toBe("dark");
+    expect(readEffectiveTheme({ effectiveTheme: "system" })).toBeNull();
+    expect(readEffectiveTheme(null)).toBeNull();
   });
 });

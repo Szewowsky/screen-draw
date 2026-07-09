@@ -18,7 +18,7 @@ import { app, ipcMain, nativeTheme } from "electron";
 import { logger } from "../logger.js";
 import { broadcast } from "../services/events.js";
 import { setTheme } from "../services/settings-store.js";
-import { resolveEffectiveTheme, type ThemeSource } from "../services/theme.js";
+import { isThemeSource, resolveEffectiveTheme, type ThemeSource } from "../services/theme.js";
 import { getUpdateNotificationState, installDownloadedUpdate } from "../services/updater.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -90,7 +90,7 @@ export function registerHandlers(): void {
   });
 
   ipcMain.handle("nativeTheme:setThemeSource", async (_event, source: unknown) => {
-    if (source !== "system" && source !== "light" && source !== "dark") {
+    if (!isThemeSource(source)) {
       throw new Error("nativeTheme:setThemeSource expects system, light, or dark");
     }
 

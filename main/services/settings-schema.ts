@@ -1,3 +1,5 @@
+import { isThemeSource, type ThemeSource } from "./theme.js";
+
 /**
  * Pure settings schema for Screen Draw.
  *
@@ -13,7 +15,7 @@ export interface ToolbarPosition {
 
 export type ToolbarPositionScope = "shared" | "per-display";
 export type ToolbarPositionByDisplay = Record<string, ToolbarPosition>;
-export type ThemeSource = "system" | "light" | "dark";
+export type { ThemeSource } from "./theme.js";
 
 export interface CursorHighlightSettings {
   enabled: boolean;
@@ -93,7 +95,7 @@ function coerceToolbarPositionScope(raw: unknown): ToolbarPositionScope {
 }
 
 function coerceThemeSource(raw: unknown): ThemeSource {
-  return raw === "light" || raw === "dark" ? raw : "system";
+  return isThemeSource(raw) ? raw : "system";
 }
 
 function coerceToolbarPositionByDisplay(raw: unknown): ToolbarPositionByDisplay {

@@ -1,3 +1,5 @@
+import type { ThemeSource } from "../../main/services/theme";
+
 /** Shared drawing constants used by the overlay surface and the control panel. */
 
 export interface PaletteColor {
@@ -80,7 +82,7 @@ export type ToolbarPositionScope = "shared" | "per-display";
 export type ToolbarPositionByDisplay = Record<string, ToolbarPosition>;
 
 export interface ScreenDrawSettings {
-  theme: "system" | "light" | "dark";
+  theme: ThemeSource;
   shortcut: string;
   defaultColor: string;
   defaultSize: number;

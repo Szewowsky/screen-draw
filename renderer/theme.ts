@@ -1,11 +1,4 @@
-type EffectiveTheme = "light" | "dark";
-
-function readEffectiveTheme(payload: unknown): EffectiveTheme | null {
-  if (payload === "light" || payload === "dark") return payload;
-  if (typeof payload !== "object" || payload === null) return null;
-  const theme = (payload as { effectiveTheme?: unknown }).effectiveTheme;
-  return theme === "light" || theme === "dark" ? theme : null;
-}
+import { readEffectiveTheme } from "../main/services/theme";
 
 function applyEffectiveTheme(payload: unknown): void {
   const theme = readEffectiveTheme(payload);

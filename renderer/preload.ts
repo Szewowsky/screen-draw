@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { NativeThemeInfo, ThemeSource } from "../main/services/theme";
 
 type IpcListener = (params: unknown) => void;
 
@@ -15,12 +16,8 @@ const screenDrawAPI = {
   },
 
   nativeTheme: {
-    getInfo: (): Promise<{
-      themeSource: "system" | "light" | "dark";
-      shouldUseDarkColors: boolean;
-      effectiveTheme: "light" | "dark";
-    }> => ipcRenderer.invoke("nativeTheme:getInfo"),
-    setThemeSource: (source: "system" | "light" | "dark"): Promise<boolean> =>
+    getInfo: (): Promise<NativeThemeInfo> => ipcRenderer.invoke("nativeTheme:getInfo"),
+    setThemeSource: (source: ThemeSource): Promise<boolean> =>
       ipcRenderer.invoke("nativeTheme:setThemeSource", source),
   },
 };
