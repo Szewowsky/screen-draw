@@ -2,7 +2,7 @@
 
 All notable changes to Screen Draw are documented here. Feature descriptions live in [docs/features.md](docs/features.md).
 
-## Unreleased — 2026-07-09
+## 1.9.0 — 2026-07-09
 
 ### Added
 - **Light appearance across app chrome.** The Theme setting now switches the control panel, Settings window, floating toolbar, controls, and popovers between coordinated light and dark palettes. System follows macOS appearance live, explicit Light or Dark applies immediately, and the choice persists across restarts; the transparent drawing overlay remains unchanged.
