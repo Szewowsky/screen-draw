@@ -20,7 +20,7 @@ export async function openSettingsWindow(): Promise<void> {
     minWidth: 400,
     minHeight: 200,
     title: "Settings",
-    backgroundColor: nativeTheme.shouldUseDarkColors ? "#101010" : "#f2f2f7",
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#111111" : "#f2f2f7",
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 18, y: 18 },
     show: false,

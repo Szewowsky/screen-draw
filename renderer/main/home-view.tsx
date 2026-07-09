@@ -458,7 +458,7 @@ export function HomeView() {
           {shortcutStatus?.failedAccelerator ? (
             <div
               role="alert"
-              className="flex items-center gap-2.5 border-t border-separator px-7 py-4 text-[13px] font-semibold leading-snug text-amber-500"
+              className="flex items-center gap-2.5 border-t border-[var(--divider)] px-7 py-4 text-[13px] font-semibold leading-snug text-[var(--warning)]"
             >
               <TriangleAlert className="size-4 shrink-0" />
               <span>
@@ -571,7 +571,7 @@ export function HomeView() {
           {failedEffectShortcut ? (
             <div
               role="alert"
-              className="flex items-center gap-2.5 border-t border-separator px-7 py-4 text-[13px] font-semibold leading-snug text-amber-500"
+              className="flex items-center gap-2.5 border-t border-[var(--divider)] px-7 py-4 text-[13px] font-semibold leading-snug text-[var(--warning)]"
             >
               <TriangleAlert className="size-4 shrink-0" />
               <span>

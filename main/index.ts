@@ -78,7 +78,7 @@ async function createMainWindow() {
     minWidth: minWindowWidth,
     minHeight: minWindowHeight,
     title: windowTitle,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? "#101010" : "#f2f2f7",
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#111111" : "#f2f2f7",
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 18, y: 18 },
     show: false, // Don't show until WebView is ready (prevents flickering)

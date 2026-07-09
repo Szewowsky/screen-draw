@@ -26,6 +26,30 @@
   --switch-thumb: #ffffff;
   --input-bg: rgb(0 0 0 / 0.3);
   --inset-highlight: rgb(255 255 255 / 0.04);
+  --tooltip-bg: #09090b;
+  --tooltip-text: #f4f4f5;
+  --tooltip-shortcut: #a1a1aa;
+  --button-text: #f4f4f5;
+  --switch-off: #2a2a2a;
+  --heading: #fafafa;
+  --description: #a1a1aa;
+  --field-panel: #181818;
+  --field-panel-inset: rgb(255 255 255 / 0.02);
+  --divider: rgb(255 255 255 / 0.08);
+  --control-text: #e4e4e7;
+  --slider-text: #fafafa;
+  --slider-icon: #f4f4f5;
+  --key-text: #a1a1aa;
+  --radio-border: #71717a;
+  --radio-inset: #18181b;
+  --toolbar-bg: rgb(29 29 31 / 0.95);
+  --swatch-border: rgb(255 255 255 / 0.15);
+  --swatch-selected: #ffffff;
+  --input-text: #f4f4f5;
+  --input-placeholder: #71717a;
+  --input-border: rgb(255 255 255 / 0.15);
+  --input-focus: rgb(255 255 255 / 0.3);
+  --warning: #fbbf24;
 }
 
 :root[data-theme="light"] {
@@ -49,6 +73,30 @@
   --switch-thumb: #ffffff;
   --input-bg: rgb(0 0 0 / 0.06);
   --inset-highlight: rgb(255 255 255 / 0.72);
+  --tooltip-bg: var(--popover);
+  --tooltip-text: var(--text-primary);
+  --tooltip-shortcut: var(--text-secondary);
+  --button-text: var(--text-primary);
+  --switch-off: var(--control);
+  --heading: var(--text-primary);
+  --description: var(--text-secondary);
+  --field-panel: var(--panel);
+  --field-panel-inset: var(--inset-highlight);
+  --divider: var(--separator);
+  --control-text: var(--text-primary);
+  --slider-text: var(--text-primary);
+  --slider-icon: var(--text-primary);
+  --key-text: var(--text-secondary);
+  --radio-border: var(--text-tertiary);
+  --radio-inset: var(--panel);
+  --toolbar-bg: var(--popover);
+  --swatch-border: rgb(0 0 0 / 0.15);
+  --swatch-selected: var(--text-primary);
+  --input-text: var(--text-primary);
+  --input-placeholder: var(--text-tertiary);
+  --input-border: rgb(0 0 0 / 0.15);
+  --input-focus: rgb(0 0 0 / 0.3);
+  --warning: #b45309;
 }
 
 html,

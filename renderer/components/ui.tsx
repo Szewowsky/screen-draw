@@ -44,13 +44,15 @@ export function TooltipContent({
   return (
     <span
       className={clsx(
-        "pointer-events-none absolute left-1/2 z-50 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-separator bg-popover px-2.5 py-1.5 text-xs font-medium text-primary shadow-xl group-hover/tooltip:block",
+        "pointer-events-none absolute left-1/2 z-50 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-separator bg-[var(--tooltip-bg)] px-2.5 py-1.5 text-xs font-medium text-[var(--tooltip-text)] shadow-xl group-hover/tooltip:block",
         side === "top" && "bottom-full mb-2",
         side === "bottom" && "top-full mt-2",
       )}
     >
       {children}
-      {shortcut?.length ? <span className="ml-2 text-secondary">{shortcut.join(" ")}</span> : null}
+      {shortcut?.length ? (
+        <span className="ml-2 text-[var(--tooltip-shortcut)]">{shortcut.join(" ")}</span>
+      ) : null}
     </span>
   );
 }
@@ -74,9 +76,9 @@ export function Button({
         variant === "accent" &&
           "rounded-full bg-orange-500 text-white shadow-sm hover:bg-orange-400 active:bg-orange-600",
         variant === "filled" &&
-          "bg-[var(--button)] text-primary hover:bg-[var(--button-hover)] active:bg-[var(--button-active)]",
+          "bg-[var(--button)] text-[var(--button-text)] hover:bg-[var(--button-hover)] active:bg-[var(--button-active)]",
         variant === "transparent" &&
-          "bg-transparent text-primary hover:bg-[var(--control-hover)] active:bg-[var(--control-active)]",
+          "bg-transparent text-[var(--button-text)] hover:bg-[var(--control-hover)] active:bg-[var(--control-active)]",
         size === "small" && (iconOnly ? "size-8" : "h-8 px-3 text-sm"),
         size === "medium" && (iconOnly ? "size-9" : "h-9 px-4 text-sm"),
         size === "large" && (iconOnly ? "size-10" : "h-12 px-5 text-base"),
@@ -107,7 +109,7 @@ export function Switch({
       onClick={() => onCheckedChange(!checked)}
       className={clsx(
         "no-drag relative h-7 w-12 shrink-0 rounded-full border border-separator transition disabled:cursor-not-allowed disabled:opacity-50",
-        checked ? "bg-orange-500" : "bg-control",
+        checked ? "bg-orange-500" : "bg-[var(--switch-off)]",
       )}
     >
       <span
@@ -194,7 +196,11 @@ export function ToolbarContent({ children }: { children: ReactNode }) {
 }
 
 export function ToolbarTitle({ children }: { children: ReactNode }) {
-  return <h1 className="truncate text-[21px] font-bold leading-none text-primary">{children}</h1>;
+  return (
+    <h1 className="truncate text-[21px] font-bold leading-none text-[var(--heading)]">
+      {children}
+    </h1>
+  );
 }
 
 export function Text({
@@ -250,14 +256,16 @@ export function FieldSet({
       {title || description ? (
         <div className="flex flex-col gap-1">
           {title ? (
-            <h2 className="text-[19px] font-bold leading-tight text-primary">{title}</h2>
+            <h2 className="text-[19px] font-bold leading-tight text-[var(--heading)]">{title}</h2>
           ) : null}
           {description ? (
-            <p className="text-[15px] font-semibold leading-snug text-secondary">{description}</p>
+            <p className="text-[15px] font-semibold leading-snug text-[var(--description)]">
+              {description}
+            </p>
           ) : null}
         </div>
       ) : null}
-      <div className="overflow-hidden rounded-[18px] bg-panel shadow-[inset_0_1px_0_var(--inset-highlight)]">
+      <div className="overflow-hidden rounded-[18px] bg-[var(--field-panel)] shadow-[inset_0_1px_0_var(--field-panel-inset)]">
         {children}
       </div>
     </section>
@@ -287,7 +295,7 @@ export function Field({
 }
 
 export function FieldGroup({ children }: { children: ReactNode }) {
-  return <div className="divide-y divide-[var(--separator)]">{children}</div>;
+  return <div className="divide-y divide-[var(--divider)]">{children}</div>;
 }
 
 export function FieldContent({ children }: { children: ReactNode }) {
@@ -296,7 +304,7 @@ export function FieldContent({ children }: { children: ReactNode }) {
 
 export function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: ReactNode }) {
   return (
-    <label htmlFor={htmlFor} className="text-[17px] font-bold leading-none text-primary">
+    <label htmlFor={htmlFor} className="text-[17px] font-bold leading-none text-[var(--heading)]">
       {children}
     </label>
   );
@@ -358,7 +366,7 @@ export function SegmentedControlItem({
         context?.onValueChange?.(value);
       }}
       className={clsx(
-        "inline-flex shrink-0 items-center justify-center rounded-md text-secondary transition hover:bg-[var(--control-hover)]",
+        "inline-flex shrink-0 items-center justify-center rounded-md text-[var(--control-text)] transition hover:bg-[var(--control-hover)]",
         iconOnly ? "size-8" : "h-8 px-3 text-sm font-semibold",
         selected && "bg-orange-500/95 text-white shadow-sm hover:bg-orange-500",
         className,
@@ -399,7 +407,7 @@ export function Slider({
   return (
     <div
       className={clsx(
-        "no-drag relative flex h-11 items-center overflow-hidden rounded-xl bg-control text-primary",
+        "no-drag relative flex h-11 items-center overflow-hidden rounded-xl bg-control text-[var(--slider-text)]",
         className,
       )}
     >
@@ -408,7 +416,7 @@ export function Slider({
         style={{ width: `${Math.max(18, fill)}%` }}
       />
       {startContent ? (
-        <span className="pointer-events-none relative z-10 flex h-full w-12 items-center justify-center text-primary">
+        <span className="pointer-events-none relative z-10 flex h-full w-12 items-center justify-center text-[var(--slider-icon)]">
           {startContent}
         </span>
       ) : null}
@@ -437,7 +445,7 @@ export function Slider({
 
 export function Key({ children }: { children: ReactNode }) {
   return (
-    <kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-separator bg-panel-muted px-1.5 text-[12px] font-bold leading-none text-secondary shadow-[inset_0_1px_0_var(--inset-highlight)]">
+    <kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-separator bg-panel-muted px-1.5 text-[12px] font-bold leading-none text-[var(--key-text)] shadow-[inset_0_1px_0_var(--inset-highlight)]">
       {children}
     </kbd>
   );
@@ -473,8 +481,8 @@ export function RadioGroupItem({ value }: { value: string }) {
       aria-hidden
       onClick={() => context?.onValueChange?.(value)}
       className={clsx(
-        "inline-flex size-4 rounded-full border border-[var(--text-tertiary)]",
-        selected && "border-orange-400 bg-orange-500 shadow-[inset_0_0_0_3px_var(--panel)]",
+        "inline-flex size-4 rounded-full border border-[var(--radio-border)]",
+        selected && "border-orange-400 bg-orange-500 shadow-[inset_0_0_0_3px_var(--radio-inset)]",
       )}
     />
   );
@@ -482,7 +490,7 @@ export function RadioGroupItem({ value }: { value: string }) {
 
 export function Label({ children }: { children: ReactNode }) {
   return (
-    <span className="no-drag inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-secondary">
+    <span className="no-drag inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-[var(--control-text)]">
       {children}
     </span>
   );
