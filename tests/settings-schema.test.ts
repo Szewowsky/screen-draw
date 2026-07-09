@@ -26,7 +26,18 @@ describe("coerceSettings", () => {
       cursorHighlight: DEFAULT_SETTINGS.cursorHighlight,
       spotlight: DEFAULT_SETTINGS.spotlight,
       effectsShortcuts: {},
+      theme: "system",
     });
+  });
+
+  it("persists valid themes and defaults missing or invalid values to system", () => {
+    for (const theme of ["system", "light", "dark"] as const) {
+      expect(coerceSettings({ theme }).theme).toBe(theme);
+    }
+
+    for (const theme of [undefined, "auto", "sepia", true, 1, {}, []]) {
+      expect(coerceSettings({ theme }).theme).toBe("system");
+    }
   });
 
   it("defaults legacy toolbar position scope to shared", () => {

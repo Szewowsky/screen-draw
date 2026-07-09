@@ -18,6 +18,7 @@ const screenDrawAPI = {
     getInfo: (): Promise<{
       themeSource: "system" | "light" | "dark";
       shouldUseDarkColors: boolean;
+      effectiveTheme: "light" | "dark";
     }> => ipcRenderer.invoke("nativeTheme:getInfo"),
     setThemeSource: (source: "system" | "light" | "dark"): Promise<boolean> =>
       ipcRenderer.invoke("nativeTheme:setThemeSource", source),

@@ -3,10 +3,12 @@ import ReactDOM from "react-dom/client";
 import "../styles.css";
 import { ErrorBoundaryView, TooltipProvider, Toaster } from "../components/ui";
 import { RootView } from "./root-view";
+import { initializeTheme } from "../theme";
 
 declare const __APP_DISPLAY_NAME__: string | undefined;
 
 document.title = __APP_DISPLAY_NAME__ || document.title;
+initializeTheme();
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
   state = { hasError: false };

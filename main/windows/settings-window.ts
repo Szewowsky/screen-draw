@@ -1,4 +1,4 @@
-import { BrowserWindow } from "electron";
+import { BrowserWindow, nativeTheme } from "electron";
 import { getPreloadPath, getWindowUrl } from "./window-paths.js";
 import { logger } from "../logger.js";
 
@@ -20,7 +20,7 @@ export async function openSettingsWindow(): Promise<void> {
     minWidth: 400,
     minHeight: 200,
     title: "Settings",
-    backgroundColor: "#111111",
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#101010" : "#f2f2f7",
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 18, y: 18 },
     show: false,

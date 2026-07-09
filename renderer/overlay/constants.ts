@@ -80,6 +80,7 @@ export type ToolbarPositionScope = "shared" | "per-display";
 export type ToolbarPositionByDisplay = Record<string, ToolbarPosition>;
 
 export interface ScreenDrawSettings {
+  theme: "system" | "light" | "dark";
   shortcut: string;
   defaultColor: string;
   defaultSize: number;

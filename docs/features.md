@@ -105,8 +105,14 @@ Screen Draw is a menu-bar app: no Dock icon. The tray (menu bar) icon offers Sho
 
 The control panel's **General** section includes **Launch at login** for the installed macOS app. Turning it on adds Screen Draw to **System Settings → General → Login Items**; turning it off there is reflected in the control panel the next time the panel regains focus. Development builds show the switch disabled with **Available in the installed app** so local Electron runs are never registered as login items.
 
+## Appearance
+
+The Settings window's **Theme** control applies to every chrome surface: the control panel, Settings, floating toolbar, tooltips, controls, and popovers. **Light** and **Dark** apply immediately. **Auto** follows the current macOS appearance and changes live when macOS switches between light and dark. The choice persists across restarts.
+
+The transparent drawing overlay is deliberately not themed. Annotation colors and the screen beneath them therefore remain identical in Light, Dark, and Auto modes.
+
 ## Settings & persistence
 
-Stored in `~/Library/Application Support/Screen Draw/screen-draw-settings.json`: activation shortcut, default color/size, toolbar position scope, shared/per-display toolbar positions, recent colors, the recordings-hide flag, and presenter effect settings. Shared toolbar tool settings and session ink are session state carried between displays while drawing. Old settings files from previous versions load cleanly.
+Stored in `~/Library/Application Support/Screen Draw/screen-draw-settings.json`: theme, activation shortcut, default color/size, toolbar position scope, shared/per-display toolbar positions, recent colors, the recordings-hide flag, and presenter effect settings. Shared toolbar tool settings and session ink are session state carried between displays while drawing. Old settings files from previous versions load cleanly and default to the system appearance.
 
 Launch at login is not stored in Screen Draw's settings file. macOS Login Items is the source of truth, so changes made in System Settings cannot drift from a copied preference value.

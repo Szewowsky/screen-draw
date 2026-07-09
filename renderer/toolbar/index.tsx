@@ -3,6 +3,9 @@ import ReactDOM from "react-dom/client";
 import { TooltipProvider } from "../components/ui";
 import "../styles.css";
 import { ToolbarView } from "./toolbar-view";
+import { initializeTheme } from "../theme";
+
+initializeTheme();
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {

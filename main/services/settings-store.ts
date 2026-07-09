@@ -11,7 +11,12 @@ import * as path from "path";
 
 import { app } from "electron";
 import { logger } from "../logger.js";
-import { DEFAULT_SETTINGS, coerceSettings, type ScreenDrawSettings } from "./settings-schema.js";
+import {
+  DEFAULT_SETTINGS,
+  coerceSettings,
+  type ScreenDrawSettings,
+  type ThemeSource,
+} from "./settings-schema.js";
 import { applySettingsDefaults, type SettingsDefaultsPatch } from "./settings-defaults.js";
 
 export type {
@@ -19,6 +24,7 @@ export type {
   CursorHighlightSettings,
   EffectsShortcuts,
   SpotlightSettings,
+  ThemeSource,
   ToolbarPosition,
   ToolbarPositionByDisplay,
   ToolbarPositionScope,
@@ -66,6 +72,11 @@ export function setShortcut(shortcut: string): ScreenDrawSettings {
     throw new Error("Shortcut cannot be empty");
   }
   persist({ ...getSettings(), shortcut: trimmed });
+  return getSettings();
+}
+
+export function setTheme(theme: ThemeSource): ScreenDrawSettings {
+  persist({ ...getSettings(), theme });
   return getSettings();
 }
 

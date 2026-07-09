@@ -233,7 +233,7 @@ export function FloatingToolbar({
   return (
     <div
       ref={barRef}
-      className="flex h-9 w-max items-center gap-0.5 rounded-[12px] border border-white/10 bg-[#1d1d1f]/95 px-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl"
+      className="flex h-9 w-max items-center gap-0.5 rounded-[12px] border border-separator bg-popover px-1.5 text-primary shadow-[0_12px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl"
     >
       <Tooltip>
         <TooltipTrigger asChild>
@@ -335,7 +335,7 @@ export function FloatingToolbar({
             aria-haspopup="dialog"
             aria-expanded={pickerOpen}
             onClick={() => onPickerOpenChange(!pickerOpen)}
-            className="no-drag size-7 shrink-0 rounded-md border border-white/15 shadow-inner"
+            className="no-drag size-7 shrink-0 rounded-md border border-separator shadow-inner"
             style={{ backgroundColor: color }}
           />
         </TooltipTrigger>
@@ -685,7 +685,7 @@ function ColorPopover({ anchorRef, color, recentColors, onApply, onClose }: Colo
       ref={popoverRef}
       role="dialog"
       aria-label="Color picker"
-      className="no-drag fixed z-40 flex w-[168px] flex-col gap-2 rounded-[12px] border border-white/10 bg-[#1d1d1f]/95 p-2.5 shadow-[0_12px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl"
+      className="no-drag fixed z-40 flex w-[168px] flex-col gap-2 rounded-[12px] border border-separator bg-popover p-2.5 text-primary shadow-[0_12px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl"
       style={pos ? { left: pos.left, top: pos.top } : { left: -9999, top: -9999 }}
     >
       <div className="grid grid-cols-5 gap-1.5">
@@ -699,7 +699,9 @@ function ColorPopover({ anchorRef, color, recentColors, onApply, onClose }: Colo
               onClick={() => onApply(c)}
               className={
                 "size-6 rounded-md border shadow-inner " +
-                (selected ? "border-white ring-1 ring-white" : "border-white/15")
+                (selected
+                  ? "border-[var(--text-primary)] ring-1 ring-[var(--text-primary)]"
+                  : "border-separator")
               }
               style={{ backgroundColor: c }}
             />
@@ -717,7 +719,7 @@ function ColorPopover({ anchorRef, color, recentColors, onApply, onClose }: Colo
                 type="button"
                 aria-label={`Recent color ${c}`}
                 onClick={() => onApply(c)}
-                className="size-6 rounded-md border border-white/15 shadow-inner"
+                className="size-6 rounded-md border border-separator shadow-inner"
                 style={{ backgroundColor: c }}
               />
             ))}
@@ -729,7 +731,7 @@ function ColorPopover({ anchorRef, color, recentColors, onApply, onClose }: Colo
 
       <div className="flex items-center gap-1.5">
         <span
-          className="size-6 shrink-0 rounded-md border border-white/15 shadow-inner"
+          className="size-6 shrink-0 rounded-md border border-separator shadow-inner"
           style={{ backgroundColor: normalizedHex ?? color }}
         />
         <input
@@ -750,8 +752,10 @@ function ColorPopover({ anchorRef, color, recentColors, onApply, onClose }: Colo
             }
           }}
           className={
-            "h-6 w-full min-w-0 rounded-md border bg-black/30 px-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-500 " +
-            (hexInvalid ? "border-red-500/70" : "border-white/15 focus:border-white/30")
+            "h-6 w-full min-w-0 rounded-md border bg-[var(--input-bg)] px-2 text-xs text-primary outline-none placeholder:text-tertiary " +
+            (hexInvalid
+              ? "border-red-500/70"
+              : "border-separator focus:border-[var(--text-tertiary)]")
           }
         />
       </div>

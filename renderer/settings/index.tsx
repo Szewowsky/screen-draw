@@ -3,6 +3,9 @@ import ReactDOM from "react-dom/client";
 import { TooltipProvider, Toaster } from "../components/ui";
 import { SettingsView } from "./settings-view";
 import "../styles.css";
+import { initializeTheme } from "../theme";
+
+initializeTheme();
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {

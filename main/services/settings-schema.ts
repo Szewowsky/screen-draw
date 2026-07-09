@@ -13,6 +13,7 @@ export interface ToolbarPosition {
 
 export type ToolbarPositionScope = "shared" | "per-display";
 export type ToolbarPositionByDisplay = Record<string, ToolbarPosition>;
+export type ThemeSource = "system" | "light" | "dark";
 
 export interface CursorHighlightSettings {
   enabled: boolean;
@@ -33,6 +34,8 @@ export interface EffectsShortcuts {
 }
 
 export interface ScreenDrawSettings {
+  /** App chrome appearance; system follows the current macOS appearance. */
+  theme: ThemeSource;
   /** Global accelerator that toggles drawing mode, e.g. "Command+Shift+D". */
   shortcut: string;
   /** Default stroke color as a hex string. */
@@ -58,6 +61,7 @@ export interface ScreenDrawSettings {
 }
 
 export const DEFAULT_SETTINGS: ScreenDrawSettings = {
+  theme: "system",
   shortcut: "Command+Shift+D",
   defaultColor: "#FF3B30",
   defaultSize: 4,
@@ -86,6 +90,10 @@ function coerceToolbarPosition(raw: unknown): ToolbarPosition | null {
 
 function coerceToolbarPositionScope(raw: unknown): ToolbarPositionScope {
   return raw === "per-display" ? "per-display" : "shared";
+}
+
+function coerceThemeSource(raw: unknown): ThemeSource {
+  return raw === "light" || raw === "dark" ? raw : "system";
 }
 
 function coerceToolbarPositionByDisplay(raw: unknown): ToolbarPositionByDisplay {
@@ -157,6 +165,7 @@ function coerceEffectsShortcuts(raw: unknown): EffectsShortcuts {
 export function coerceSettings(raw: unknown): ScreenDrawSettings {
   const value = (raw ?? {}) as Partial<Record<keyof ScreenDrawSettings, unknown>>;
   return {
+    theme: coerceThemeSource(value.theme),
     shortcut:
       typeof value.shortcut === "string" && value.shortcut.trim()
         ? value.shortcut

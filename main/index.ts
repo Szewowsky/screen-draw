@@ -4,7 +4,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
-import { app, BrowserWindow, Menu, Tray, nativeImage } from "electron";
+import { app, BrowserWindow, Menu, Tray, nativeImage, nativeTheme } from "electron";
 
 import { registerHandlers } from "./handlers/index.js";
 import { getPreloadPath, getWindowUrl } from "./windows/window-paths.js";
@@ -19,6 +19,7 @@ import { registerEffectsShortcuts, registerToggleShortcut } from "./services/sho
 import { startLatencyTriggerWatcher } from "./services/latency-probe.js";
 import { broadcast } from "./services/events.js";
 import { logger } from "./logger.js";
+import { resolveEffectiveTheme, type ThemeSource } from "./services/theme.js";
 
 // Get directory paths
 const __filename = fileURLToPath(import.meta.url);
@@ -76,7 +77,7 @@ async function createMainWindow() {
     minWidth: minWindowWidth,
     minHeight: minWindowHeight,
     title: windowTitle,
-    backgroundColor: "#111111",
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#101010" : "#f2f2f7",
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 18, y: 18 },
     show: false, // Don't show until WebView is ready (prevents flickering)
@@ -292,6 +293,15 @@ app.whenReady().then(async () => {
   });
 
   app.setName("Screen Draw");
+  nativeTheme.themeSource = getSettings().theme;
+  const broadcastEffectiveTheme = () => {
+    const themeSource = nativeTheme.themeSource as ThemeSource;
+    broadcast("nativeTheme:updated", {
+      effectiveTheme: resolveEffectiveTheme(themeSource, nativeTheme.shouldUseDarkColors),
+    });
+  };
+  nativeTheme.on("updated", broadcastEffectiveTheme);
+  broadcastEffectiveTheme();
   if (process.platform === "darwin") {
     app.dock?.hide();
   }

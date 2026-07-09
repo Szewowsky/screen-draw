@@ -16,6 +16,9 @@ import { registerLatencyProbeHandlers } from "../services/latency-probe.js";
 
 import { app, ipcMain, nativeTheme } from "electron";
 import { logger } from "../logger.js";
+import { broadcast } from "../services/events.js";
+import { setTheme } from "../services/settings-store.js";
+import { resolveEffectiveTheme, type ThemeSource } from "../services/theme.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -77,9 +80,11 @@ export function registerHandlers(): void {
   });
 
   ipcMain.handle("nativeTheme:getInfo", async () => {
+    const themeSource = nativeTheme.themeSource as ThemeSource;
     return {
-      themeSource: nativeTheme.themeSource,
+      themeSource,
       shouldUseDarkColors: nativeTheme.shouldUseDarkColors,
+      effectiveTheme: resolveEffectiveTheme(themeSource, nativeTheme.shouldUseDarkColors),
     };
   });
 
@@ -88,7 +93,12 @@ export function registerHandlers(): void {
       throw new Error("nativeTheme:setThemeSource expects system, light, or dark");
     }
 
+    const next = setTheme(source);
     nativeTheme.themeSource = source;
+    broadcast("settings:changed", next);
+    broadcast("nativeTheme:updated", {
+      effectiveTheme: resolveEffectiveTheme(source, nativeTheme.shouldUseDarkColors),
+    });
     return true;
   });
 

@@ -15,6 +15,40 @@
   --text-primary: #f7f7f7;
   --text-secondary: #b7b7b7;
   --text-tertiary: #888888;
+  --control: #242424;
+  --control-hover: rgb(255 255 255 / 0.08);
+  --control-active: rgb(255 255 255 / 0.12);
+  --button: #27272a;
+  --button-hover: #3f3f46;
+  --button-active: #18181b;
+  --slider-fill: rgb(93 57 36 / 0.55);
+  --slider-track: rgb(255 255 255 / 0.16);
+  --switch-thumb: #ffffff;
+  --input-bg: rgb(0 0 0 / 0.3);
+  --inset-highlight: rgb(255 255 255 / 0.04);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --app-bg: #f2f2f7;
+  --panel: #ffffff;
+  --panel-muted: #e9e9ee;
+  --popover: rgb(255 255 255 / 0.96);
+  --separator: rgb(0 0 0 / 0.12);
+  --text-primary: #171717;
+  --text-secondary: #55555c;
+  --text-tertiary: #76767e;
+  --control: #e3e3e8;
+  --control-hover: rgb(0 0 0 / 0.06);
+  --control-active: rgb(0 0 0 / 0.1);
+  --button: #dedee4;
+  --button-hover: #d2d2d8;
+  --button-active: #c8c8ce;
+  --slider-fill: rgb(255 149 0 / 0.24);
+  --slider-track: rgb(0 0 0 / 0.16);
+  --switch-thumb: #ffffff;
+  --input-bg: rgb(0 0 0 / 0.06);
+  --inset-highlight: rgb(255 255 255 / 0.72);
 }
 
 html,
@@ -68,6 +102,22 @@ textarea {
   background: var(--popover);
 }
 
+.bg-panel {
+  background: var(--panel);
+}
+
+.bg-panel-muted {
+  background: var(--panel-muted);
+}
+
+.bg-control {
+  background: var(--control);
+}
+
+.bg-separator {
+  background: var(--separator);
+}
+
 .border-separator {
   border-color: var(--separator);
 }
@@ -98,7 +148,7 @@ label {
 .slider-input::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 999px;
-  background: rgb(255 255 255 / 0.16);
+  background: var(--slider-track);
 }
 
 .slider-input::-webkit-slider-thumb {
