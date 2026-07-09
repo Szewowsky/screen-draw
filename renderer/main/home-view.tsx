@@ -29,6 +29,7 @@ import {
   type ScreenDrawSettings,
   type ShortcutStatus,
 } from "../overlay/constants";
+import type { UpdateNotificationState } from "../../main/services/update-state";
 
 const TOOL_SHORTCUT_LABELS = {
   select: "Select & move",
@@ -184,6 +185,8 @@ export function HomeView() {
   const [sticky, setSticky] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [openAtLoginState, setOpenAtLoginState] = useState<OpenAtLoginState | undefined>(undefined);
+  const [updateState, setUpdateState] = useState<UpdateNotificationState>({ status: "idle" });
+  const [dismissedUpdateVersion, setDismissedUpdateVersion] = useState<string | null>(null);
 
   const refreshOpenAtLogin = useCallback(() => {
     void window.screenDraw.ipc
@@ -207,6 +210,16 @@ export function HomeView() {
   useEffect(() => {
     refreshOpenAtLogin();
   }, [refreshOpenAtLogin]);
+
+  useEffect(() => {
+    void window.screenDraw.ipc
+      .invoke<UpdateNotificationState>("updater:getState")
+      .then(setUpdateState);
+    const unsub = window.screenDraw.ipc.on("updater:state-changed", (params) => {
+      setUpdateState(params as UpdateNotificationState);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     window.addEventListener("focus", refreshOpenAtLogin);
@@ -335,6 +348,10 @@ export function HomeView() {
     effectsShortcutStatus?.highlight.failedAccelerator ??
     effectsShortcutStatus?.spotlight.failedAccelerator ??
     null;
+  const updateInProgress =
+    updateState.status === "available" || updateState.status === "downloading";
+  const updateReady =
+    updateState.status === "downloaded" && dismissedUpdateVersion !== updateState.version;
 
   return (
     <ScrollArea
@@ -347,6 +364,38 @@ export function HomeView() {
       }
     >
       <div className="flex flex-col gap-8 px-7 pb-8">
+        {updateInProgress ? (
+          <div role="status" className="rounded-panel border border-separator bg-panel p-4">
+            <Text variant="small" color="secondary">
+              Downloading update {updateState.version}…
+            </Text>
+          </div>
+        ) : null}
+
+        {updateReady ? (
+          <div role="status" className="rounded-panel border border-separator bg-panel p-4">
+            <div className="flex flex-col gap-3">
+              <Text>Update to {updateState.version} is ready.</Text>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="accent"
+                  size="small"
+                  onClick={() => void window.screenDraw.ipc.invoke("updater:quitAndInstall")}
+                >
+                  Install &amp; Restart
+                </Button>
+                <Button
+                  variant="transparent"
+                  size="small"
+                  onClick={() => setDismissedUpdateVersion(updateState.version)}
+                >
+                  Later
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="flex flex-col gap-4">
           <Text color="secondary">
             Draw, highlight, and point anywhere on your screen — ideal for tutorials and screen

@@ -19,6 +19,7 @@ import { logger } from "../logger.js";
 import { broadcast } from "../services/events.js";
 import { setTheme } from "../services/settings-store.js";
 import { resolveEffectiveTheme, type ThemeSource } from "../services/theme.js";
+import { getUpdateNotificationState, installDownloadedUpdate } from "../services/updater.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -101,6 +102,9 @@ export function registerHandlers(): void {
     });
     return true;
   });
+
+  ipcMain.handle("updater:getState", async () => getUpdateNotificationState());
+  ipcMain.handle("updater:quitAndInstall", async () => installDownloadedUpdate());
 
   // Drawing overlay + settings handlers
   registerOverlayHandlers();

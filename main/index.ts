@@ -20,6 +20,7 @@ import { startLatencyTriggerWatcher } from "./services/latency-probe.js";
 import { broadcast } from "./services/events.js";
 import { logger } from "./logger.js";
 import { resolveEffectiveTheme, type ThemeSource } from "./services/theme.js";
+import { startUpdater } from "./services/updater.js";
 
 // Get directory paths
 const __filename = fileURLToPath(import.meta.url);
@@ -315,6 +316,7 @@ app.whenReady().then(async () => {
 
   await setupApplicationMenu();
   setupTray();
+  startUpdater();
 
   // Create the drawing overlay (hidden) and register the activation shortcut.
   createOverlayWindow()

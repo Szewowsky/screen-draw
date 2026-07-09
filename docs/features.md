@@ -111,6 +111,12 @@ The Settings window's **Theme** control applies to every chrome surface: the con
 
 The transparent drawing overlay is deliberately not themed. Annotation colors and the screen beneath them therefore remain identical in Light, Dark, and Auto modes.
 
+## Updates
+
+Installed builds check the signed GitHub Releases feed shortly after launch and every six hours while Screen Draw remains open. A newer version downloads in the background without blocking drawing. While it downloads, the control panel shows the target version; once ready, it offers **Install & Restart** and **Later**.
+
+**Install & Restart** closes Screen Draw, applies the Developer ID-signed update, and reopens the app. **Later** dismisses the notice for the current panel session and leaves the downloaded update staged instead of installing it on ordinary app quit. Offline or failed checks do not show a modal or nag. Development builds run without auto-update.
+
 ## Settings & persistence
 
 Stored in `~/Library/Application Support/Screen Draw/screen-draw-settings.json`: theme, activation shortcut, default color/size, toolbar position scope, shared/per-display toolbar positions, recent colors, the recordings-hide flag, and presenter effect settings. Shared toolbar tool settings and session ink are session state carried between displays while drawing. Old settings files from previous versions load cleanly and default to the system appearance.
